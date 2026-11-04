@@ -116,12 +116,26 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # ------------------------------------------------------------------- database
 # SQLite. (Connection tuning + custom user model are done in Task 1.2.)
+# SQLite, tuned for a web app that may run several workers.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        "OPTIONS": {
+            # Wait up to 20s for a lock instead of failing at once with
+            # "database is locked".
+            "timeout": 20,
+            # WAL: readers don't block the writer (and vice versa).
+            "init_command": "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;",
+            # Take the write lock at BEGIN, so a transaction can't fail halfway
+            # while upgrading from read to write lock.
+            "transaction_mode": "IMMEDIATE",
+        },
     }
 }
+
+# Custom user (email login). Must be set before the very first `migrate`.
+AUTH_USER_MODEL = "accounts.User"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
