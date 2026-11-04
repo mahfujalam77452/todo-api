@@ -18,6 +18,15 @@ class Todo(models.Model):
     priority = models.PositiveSmallIntegerField(
         choices=Priority.choices, default=Priority.MEDIUM
     )
+    # Many todos -> one category. Deleting a category keeps its todos and
+    # simply clears their category (SET_NULL).
+    category = models.ForeignKey(
+        "categories.Category",
+        on_delete=models.SET_NULL,
+        related_name="todos",
+        null=True,
+        blank=True,
+    )
     # null=True only until Phase 4 (auth). It becomes non-null in Task 4.4.
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
