@@ -38,3 +38,8 @@ def permission_denied(request, exception=None):
 
 def not_found(request, exception=None):
     return JsonResponse({"error": "Not found.", "code": 404}, status=404)
+    
+def server_error(request):
+    """handler500: errors outside DRF views (middleware, admin, URL config).
+    Used when DEBUG is false; the real error is logged by Django."""
+    return JsonResponse({"error": "Internal server error", "code": 500}, status=500)

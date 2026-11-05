@@ -172,3 +172,25 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
 }
+
+
+# ------------------------------------------------------------------- logging
+# Everything goes to the console (Docker/PaaS collect stdout). Tracebacks of
+# unexpected errors are logged by "api.errors"; clients only get a generic 500.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "api": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        # Only server errors (5xx) outside DRF views; client errors (4xx) are
+        # normal API answers and are covered by the request log (Task 2.4).
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+    },
+}

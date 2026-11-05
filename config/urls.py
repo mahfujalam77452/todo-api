@@ -24,3 +24,4 @@ urlpatterns = [
 handler400 = "core.views.bad_request"
 handler403 = "core.views.permission_denied"
 handler404 = "core.views.not_found"
+handler500 = "core.views.server_error"
