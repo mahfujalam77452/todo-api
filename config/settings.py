@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third party
     "rest_framework",
+    "django_filters",
     # Local apps
     "core",
     "accounts",
@@ -85,6 +86,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "core.middleware.RequestLoggingMiddleware",  # first: times the whole request
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -156,6 +158,7 @@ USE_I18N = True
 USE_TZ = True  # stored as UTC in the database
 
 STATIC_URL = "static/"
+STATIC_URL_PREFIX = "/" + STATIC_URL.lstrip("/")  # used by the request log
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Reject request bodies bigger than this (judged by the Content-Length header).
@@ -171,26 +174,64 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
+        # ?limit=&offset= on list endpoints (categories opt out, see CategoryViewSet)
+    "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardLimitOffsetPagination",
+    # ?status=... etc., defined per view in a FilterSet
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
 
 # ------------------------------------------------------------------- logging
-# Everything goes to the console (Docker/PaaS collect stdout). Tracebacks of
-# unexpected errors are logged by "api.errors"; clients only get a generic 500.
+# Console by default (Docker/PaaS collect stdout). Set LOG_FILE to also write a
+# rotating file (5 MB x 5). Every line carries the request id; see core/logging.py.
+SLOW_REQUEST_MS = 1000  # a request this slow is logged as a WARNING
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {"traceback_only": {"()": "core.logging.OnlyWithTraceback"}},
     "formatters": {
-        "standard": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"},
+        "standard": {
+            "format": "%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s"
+        },
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "standard"},
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {
+        # api.request: one line per request; api.errors: tracebacks of bugs
         "api": {"handlers": ["console"], "level": "INFO", "propagate": False},
-        # Only server errors (5xx) outside DRF views; client errors (4xx) are
-        # normal API answers and are covered by the request log (Task 2.4).
-        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        # runserver's own access log repeats every request (with the raw query
+        # string, tokens included); api.request already covers it.
+        "django.server": {"handlers": ["console"], "level": "CRITICAL", "propagate": False},
+        # Crashes outside DRF views (admin, middleware) with their traceback.
+        # Everything else is already covered by api.request / api.errors.
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "filters": ["traceback_only"],
+            "propagate": False,
+        },
     },
 }
+
+LOG_FILE = os.environ.get("LOG_FILE", "").strip()
+if LOG_FILE:
+    try:
+        Path(LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
+        open(LOG_FILE, "a", encoding="utf-8").close()  # is it writable?
+    except OSError as exc:
+        # A log file problem must not stop the API from starting.
+        print(f"LOG_FILE ignored ({exc}); logging to the console only.", file=sys.stderr)
+    else:
+        LOGGING["handlers"]["file"] = {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_FILE,
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 5,
+            "encoding": "utf-8",
+            "formatter": "standard",
+        }
+        for target in (LOGGING["root"], *LOGGING["loggers"].values()):
+            target["handlers"].append("file")
