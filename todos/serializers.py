@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.utils import timezone
+from rest_framework.exceptions import NotFound
 
 from categories.models import Category
 from core.fields import (
@@ -40,3 +42,33 @@ class TodoSerializer(serializers.ModelSerializer):
         ]
         # `user` is deliberately not a field: clients can never set it.
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def update(self, instance, validated_data):
+        """Write only the columns that actually changed.
+
+        - Nothing changed (e.g. PATCH {} or the same values) -> no write and
+          `updated_at` stays as it was.
+        - Two clients patching *different* fields at the same time no longer
+          overwrite each other: the default `instance.save()` rewrites every
+          column from a possibly stale copy; this UPDATE touches only the
+          changed ones.
+        - `.update()` skips auto_now, so `updated_at` is set explicitly.
+        """
+        changed = {
+            field: value
+            for field, value in validated_data.items()
+            if getattr(instance, field) != value
+        }
+        if not changed:
+            return instance
+
+        now = timezone.now()
+        rows = Todo.objects.filter(pk=instance.pk).update(**changed, updated_at=now)
+        if rows == 0:
+            # Deleted by someone else between our read and this write.
+            raise NotFound()
+
+        for field, value in changed.items():
+            setattr(instance, field, value)
+        instance.updated_at = now
+        return instance
