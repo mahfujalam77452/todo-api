@@ -3,7 +3,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from categories.views import CategoryViewSet
-from core.views import HealthView
+from core.views import ApiNotFoundView, HealthView
 from todos.views import TodoViewSet
 
 # Default routes, but without the trailing slash: /api/categories, /api/categories/1
@@ -16,4 +16,11 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health", HealthView.as_view(), name="health"),
     path("api/", include(router.urls)),
+    # Must stay last: any other /api/... URL is a JSON 404.
+    path("api/<path:unknown>", ApiNotFoundView.as_view(), name="api-not-found"),
 ]
+
+# Errors for URLs outside /api/ and Django-level failures (used when DEBUG is false).
+handler400 = "core.views.bad_request"
+handler403 = "core.views.permission_denied"
+handler404 = "core.views.not_found"

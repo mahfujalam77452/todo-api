@@ -170,4 +170,5 @@ REST_FRAMEWORK = {
     # Empty list now so no Session/Basic auth sneaks in (it would turn 401s into 403s).
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
 }
