@@ -10,7 +10,7 @@ from todos.views import TodoViewSet
 router = DefaultRouter(trailing_slash=False)
 router.include_format_suffixes = False  # no /api/categories.json variants
 router.register("categories", CategoryViewSet, basename="category")
-outer.register("todos", TodoViewSet, basename="todo")
+router.register("todos", TodoViewSet, basename="todo")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
