@@ -1,18 +1,41 @@
 import re
 from rest_framework import serializers
-
+from .text import TextError, clean_text
 
 class StrictCharField(serializers.CharField):
-    """CharField that only accepts JSON strings.
+    """CharField for names, titles and descriptions.
 
-    DRF's CharField silently converts numbers (5.5 -> "5.5"); for names and
-    titles that hides client bugs, so we reject anything that is not a string.
+    - accepts only JSON strings (DRF would turn 5.5 into "5.5")
+    - NFC-normalises and trims, including zero-width characters at the edges
+    - rejects control characters and bidi overrides; with `single_line=True`
+      (titles, names) line breaks and tabs are rejected too
+    - text that is only invisible characters counts as blank
+    The cleaning happens *before* the length validators, so max_length counts
+    the characters that will actually be stored.
     """
+
+    default_error_messages = {
+        "control_characters": "Control characters and line breaks are not allowed.",
+        "bidi_controls": "Text direction override characters are not allowed.",
+    }
+
+    def __init__(self, *, single_line=False, **kwargs):
+        self.single_line = single_line
+        super().__init__(**kwargs)
 
     def to_internal_value(self, data):
         if not isinstance(data, str):
             self.fail("invalid")  # "Not a valid string."
-        return super().to_internal_value(data)
+        value = super().to_internal_value(data)
+        try:
+            cleaned = clean_text(value, single_line=self.single_line)
+        except TextError as exc:
+            self.fail(exc.code)
+        if cleaned == "" and not self.allow_blank:
+            self.fail("blank")
+        return cleaned
+
+
 class StrictBooleanField(serializers.BooleanField):
     """BooleanField that only accepts JSON true/false.
 

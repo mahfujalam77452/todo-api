@@ -158,12 +158,14 @@ USE_TZ = True  # stored as UTC in the database
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-
+# Reject request bodies bigger than this (judged by the Content-Length header).
+# The largest valid todo is ~45 KB (10,000 characters x up to 4 bytes + title).
+DATA_UPLOAD_MAX_MEMORY_SIZE = 256 * 1024
 # ------------------------------------------------------------ Django REST Framework
 REST_FRAMEWORK = {
     # JSON only: no browsable HTML API, and form/plain-text bodies get 415.
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "DEFAULT_PARSER_CLASSES": ["core.parsers.SafeJSONParser"],
     # Auth is added in Phase 4 (JWT + IsAuthenticated by default).
     # Empty list now so no Session/Basic auth sneaks in (it would turn 401s into 403s).
     "DEFAULT_AUTHENTICATION_CLASSES": [],

@@ -22,7 +22,7 @@ DUE_DATE_MAX_YEAR = 2099
 
 
 class TodoSerializer(serializers.ModelSerializer):
-    title = StrictCharField(max_length=255)
+    title = StrictCharField(max_length=255, single_line=True)
     description = StrictCharField(
         required=False, allow_blank=True, default="", max_length=DESCRIPTION_MAX_LENGTH
     )
@@ -76,7 +76,7 @@ class TodoSerializer(serializers.ModelSerializer):
             )
         return value
 
-        
+
     def update(self, instance, validated_data):
         """Write only the columns that actually changed.
 

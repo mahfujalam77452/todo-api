@@ -11,7 +11,7 @@ DUPLICATE_MESSAGE = "A category with this name already exists."
 
 
 class CategorySerializer(serializers.ModelSerializer):
-    name = StrictCharField(max_length=50)
+    name = StrictCharField(max_length=50,single_line=True)
 
     class Meta:
         model = Category
