@@ -1,3 +1,4 @@
+import re
 from rest_framework import serializers
 
 
@@ -44,4 +45,54 @@ class StrictPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
             self.fail("incorrect_type", data_type=type(data).__name__)
         if not 0 < data < 2**63:  # can never exist; also avoids SQLite overflow
             self.fail("does_not_exist", pk_value=data)
+        return super().to_internal_value(data)
+
+# YYYY-MM-DD[T| ]hh:mm[:ss[.ffffff]][Z|+hh:mm|+hhmm|+hh]  (ASCII only, whole string).
+# Whether the date itself exists (Feb 30) is checked by DRF afterwards.
+_DATETIME_PATTERN = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}"
+    r"(:[0-9]{2}(\.[0-9]{1,6})?)?"
+    r"(Z|[+-][0-9]{2}(:?[0-9]{2})?)?"
+)
+
+
+class StrictDateTimeField(serializers.DateTimeField):
+    """DateTimeField that insists on an explicit date *and* time in ASCII.
+
+    DRF would also accept a bare date ("2026-12-01" -> 00:00, so the todo
+    would look overdue from the first minute of its due day), compact forms
+    and non-ASCII digits. Anything else is parsed by DRF as usual; a value
+    without an offset is read as the current time zone (Asia/Dhaka).
+    """
+
+    default_error_messages = {
+        "format": "Use a full date and time, e.g. 2026-12-01T18:00:00+06:00.",
+    }
+
+    def to_internal_value(self, value):
+        if (
+            not isinstance(value, str)
+            or not value.isascii()
+            or not _DATETIME_PATTERN.fullmatch(value)
+        ):
+            self.fail("format")
+        return super().to_internal_value(value)
+
+
+class StrictIntegerChoiceField(serializers.ChoiceField):
+    """Choice field for integer choices that accepts only real JSON integers.
+
+    DRF's ChoiceField compares str(value), so "2" would be accepted for 2.
+    """
+
+    def __init__(self, choices, **kwargs):
+        allowed = ", ".join(f"{value} ({label})" for value, label in choices)
+        kwargs.setdefault(
+            "error_messages", {"invalid_choice": f"Must be one of: {allowed}."}
+        )
+        super().__init__(choices=choices, **kwargs)
+
+    def to_internal_value(self, data):
+        if isinstance(data, bool) or not isinstance(data, int):
+            self.fail("invalid_choice", input=data)
         return super().to_internal_value(data)
