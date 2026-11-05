@@ -9,6 +9,8 @@ class CategoryViewSet(ModelViewSet):
 
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    # A small, admin-managed list that dropdowns need in full: not paginated.
+    pagination_class = None
     # Only digits that fit a 64-bit integer, so /categories/abc and absurdly
     # large ids are a clean 404 instead of an overflow error in SQLite.
     lookup_value_regex = r"\d{1,18}"
