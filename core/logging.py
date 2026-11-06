@@ -6,6 +6,7 @@ request is handled (including tracebacks from "api.errors") carries it.
 """
 import contextvars
 import logging
+import time
 
 request_id_var = contextvars.ContextVar("request_id", default="-")
 
