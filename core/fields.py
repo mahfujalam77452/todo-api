@@ -1,5 +1,9 @@
+import datetime
 import re
+
+from django.utils import timezone
 from rest_framework import serializers
+
 from .text import TextError, clean_text
 
 class StrictCharField(serializers.CharField):
@@ -101,7 +105,21 @@ class StrictDateTimeField(serializers.DateTimeField):
             self.fail("format")
         return super().to_internal_value(value)
 
+def ensure_in_year_window(value, min_year, max_year):
+    """Raise a ValidationError unless min_year <= value.year <= max_year.
 
+    Judged in the current time zone (Asia/Dhaka). It also keeps absurd values
+    (year 1 or 9999) away from the database, where time-zone conversion would
+    overflow.
+    """
+    tz = timezone.get_current_timezone()
+    lowest = datetime.datetime(min_year, 1, 1, tzinfo=tz)
+    highest = datetime.datetime(max_year + 1, 1, 1, tzinfo=tz)
+    if not lowest <= value < highest:
+        raise serializers.ValidationError(
+            f"Date must be between {min_year}-01-01 and {max_year}-12-31."
+        )
+        
 class StrictIntegerChoiceField(serializers.ChoiceField):
     """Choice field for integer choices that accepts only real JSON integers.
 

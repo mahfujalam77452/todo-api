@@ -1,15 +1,15 @@
-import datetime
-from rest_framework import serializers
 from django.utils import timezone
+from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 
 from categories.models import Category
 from core.fields import (
     StrictBooleanField,
     StrictCharField,
-    StrictPrimaryKeyRelatedField,
     StrictDateTimeField,
     StrictIntegerChoiceField,
+    StrictPrimaryKeyRelatedField,
+    ensure_in_year_window,
 )
 
 from .models import Todo
@@ -64,17 +64,10 @@ class TodoSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
     
     def validate_due_date(self, value):
-        if value is None:
-            return value
-        tz = timezone.get_current_timezone()
-        lowest = datetime.datetime(DUE_DATE_MIN_YEAR, 1, 1, tzinfo=tz)
-        highest = datetime.datetime(DUE_DATE_MAX_YEAR + 1, 1, 1, tzinfo=tz)
-        if not lowest <= value < highest:
-            raise serializers.ValidationError(
-                f"Date must be between {DUE_DATE_MIN_YEAR}-01-01 "
-                f"and {DUE_DATE_MAX_YEAR}-12-31."
-            )
+        if value is not None:
+            ensure_in_year_window(value, DUE_DATE_MIN_YEAR, DUE_DATE_MAX_YEAR)
         return value
+    
 
 
     def update(self, instance, validated_data):

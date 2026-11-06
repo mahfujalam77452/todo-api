@@ -10,9 +10,18 @@ import unicodedata
 from django.db.models import F
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
+from .fields import StrictDateTimeField, ensure_in_year_window
 
 _ID = re.compile(r"[1-9][0-9]{0,17}")  # ASCII digits only, no leading zero, fits int64
 _TERM = re.compile(r"-?[a-z_]{1,40}")
+
+
+# In a URL a "+" means a space, so ...T10:00:00+06:00 arrives as "...T10:00:00 06:00".
+# Only a space *after* a complete time can be such a mangled "+".
+_MANGLED_OFFSET = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?) (\d{2}(?::?\d{2})?)$"
+)
+
 
 MAX_ORDERING_LENGTH = 200
 MAX_SEARCH_LENGTH = 100
@@ -37,7 +46,16 @@ def parse_bool(raw, name):
         return False
     raise ValidationError({name: [f"{name} must be true or false."]})
 
-
+def parse_datetime_param(raw, name, *, min_year, max_year):
+    """A full ISO-8601 date and time (same rules as the due_date field)."""
+    raw = _MANGLED_OFFSET.sub(r"\1+\2", raw.strip())
+    try:
+        value = StrictDateTimeField().run_validation(raw)
+        ensure_in_year_window(value, min_year, max_year)
+    except ValidationError as exc:
+        raise ValidationError({name: exc.detail})
+    return value
+    
 class StrictOrderingFilter(OrderingFilter):
     """?ordering=-priority,title
 

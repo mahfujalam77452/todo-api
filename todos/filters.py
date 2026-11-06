@@ -1,10 +1,13 @@
+from django.db.models import Q
+from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework.exceptions import ValidationError
 
 from categories.models import Category
-from core.filters import parse_bool, parse_id
+from core.filters import parse_bool, parse_datetime_param, parse_id
 
 from .models import Todo
+from .serializers import DUE_DATE_MAX_YEAR, DUE_DATE_MIN_YEAR
 
 STATUS_CHOICES = [("completed", "completed"), ("pending", "pending")]
 MAX_CATEGORY_FILTERS = 20
@@ -26,6 +29,22 @@ class TodoFilter(filters.FilterSet):
         method="filter_has_category",
         help_text="true: only todos with a category, false: only todos without one",
     )
+    priority = filters.CharFilter(
+        method="filter_priority",
+        help_text="1 (low), 2 (medium) or 3 (high). Repeat for several: ?priority=2&priority=3",
+    )
+    overdue = filters.CharFilter(
+        method="filter_overdue",
+        help_text="true: not completed and past its due date; false: everything else",
+    )
+    due_before = filters.CharFilter(
+        method="filter_due_before",
+        help_text="due on or before this date and time, e.g. 2026-12-01T18:00:00+06:00",
+    )
+    due_after = filters.CharFilter(
+        method="filter_due_after",
+        help_text="due on or after this date and time, e.g. 2026-12-01T18:00:00+06:00",
+    )
 
     class Meta:
         model = Todo
@@ -38,7 +57,7 @@ class TodoFilter(filters.FilterSet):
             if "status" in data:
                 data["status"] = data["status"].strip().lower()
             # Blank values (?category=&category=3) are dropped before filtering.
-            for key in ("category", "has_category"):
+            for key in ("category", "has_category", "priority", "overdue", "due_before", "due_after"):
                 if key in data:
                     values = [v.strip() for v in data.getlist(key) if v.strip()]
                     if values:
@@ -71,3 +90,34 @@ class TodoFilter(filters.FilterSet):
 
     def filter_has_category(self, queryset, name, value):
         return queryset.filter(category__isnull=not parse_bool(value, name))
+
+    def filter_priority(self, queryset, name, value):
+        allowed = {str(number): number for number, _ in Todo.Priority.choices}
+        chosen = []
+        for raw in self.data.getlist(name):
+            if raw.strip() not in allowed:  # exact text: "01", "٣", "2.0" are all refused
+                labels = ", ".join(f"{n} ({label})" for n, label in Todo.Priority.choices)
+                raise ValidationError(
+                    {name: [f"priority must be one of: {labels}. "
+                            f"To pass several, repeat the parameter: ?priority=2&priority=3."]}
+                )
+            chosen.append(allowed[raw.strip()])
+        return queryset.filter(priority__in=chosen)
+
+    def filter_overdue(self, queryset, name, value):
+        overdue = parse_bool(value, name)
+        # Past due and still open. A todo without a due date is never overdue, and
+        # exactly "now" is not yet overdue. `now` is read per request.
+        condition = Q(is_completed=False, due_date__lt=timezone.now())
+        return queryset.filter(condition) if overdue else queryset.exclude(condition)
+
+    def _due(self, name, value):
+        return parse_datetime_param(
+            value, name, min_year=DUE_DATE_MIN_YEAR, max_year=DUE_DATE_MAX_YEAR
+        )
+
+    def filter_due_before(self, queryset, name, value):
+        return queryset.filter(due_date__lte=self._due(name, value))
+
+    def filter_due_after(self, queryset, name, value):
+        return queryset.filter(due_date__gte=self._due(name, value))
