@@ -3,7 +3,7 @@ import re
 import time
 import uuid
 from urllib.parse import parse_qsl
-
+from django.utils.functional import SimpleLazyObject, empty
 from django.conf import settings
 
 from .logging import request_id_var
@@ -38,6 +38,18 @@ def _safe_query(query_string: str) -> str:
         parts.append(f"{key}=***" if _SENSITIVE.search(key) else f"{key}={value}")
     return "?" + "&".join(parts)
 
+def _user_id(request) -> str:
+    """The id of the authenticated user, or "-".
+
+    DRF stores the user it authenticated on the Django request, so after the
+    view ran it is there without any extra query. A lazy user that nobody
+    evaluated (admin, static files, 404s) is left alone: touching it would
+    read the session from the database just for a log line.
+    """
+    user = request.__dict__.get("user")
+    if user is None or (isinstance(user, SimpleLazyObject) and user._wrapped is empty):
+        return "-"
+    return str(user.pk) if getattr(user, "is_authenticated", False) else "-"
 
 class RequestLoggingMiddleware:
     """One log line per request: method, path, status and duration.
@@ -71,7 +83,10 @@ class RequestLoggingMiddleware:
 
     def _log(self, request, status, elapsed_ms):
         target = _printable(request.path + _safe_query(request.META.get("QUERY_STRING", "")))
-        message = f"{_printable(request.method)} {target} {status} {elapsed_ms:.1f}ms"
+        message = (
+            f"{_printable(request.method)} {target} {status} {elapsed_ms:.1f}ms "
+            f"user={_user_id(request)}"
+        )
 
         noisy = request.path == "/api/health" or request.path.startswith(settings.STATIC_URL_PREFIX)
         if status >= 500:
