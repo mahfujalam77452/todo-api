@@ -141,6 +141,53 @@ AUTH_USER_MODEL = "accounts.User"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# ---------------------------------------------------------------------- cache
+# With REDIS_URL set (e.g. redis://localhost:6379/1) the cache is Redis, shared
+# by every worker and surviving restarts. Without it a per-process in-memory
+# cache is used, so the project runs fine without Redis during development.
+REDIS_URL = os.environ.get("REDIS_URL", "").strip()
+if REDIS_URL and not REDIS_URL.startswith(("redis://", "rediss://", "unix://")):
+    raise ImproperlyConfigured(
+        "REDIS_URL must start with redis://, rediss:// or unix:// "
+        f"(got {REDIS_URL.split('@')[-1][:30]!r})."  # never print a password
+    )
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "KEY_PREFIX": "todoapp",  # lets several apps share one Redis
+            "TIMEOUT": 300,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                # We only cache JSON-friendly data. The default (pickle) would let
+                # anyone who can write to Redis run code in this app.
+                "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
+                # Redis is an optimisation: if it is down, the API keeps working
+                # (a cache miss) instead of returning 500s.
+                "IGNORE_EXCEPTIONS": True,
+                # ...and must fail fast, not hang every request.
+                "SOCKET_CONNECT_TIMEOUT": 0.5,
+                "SOCKET_TIMEOUT": 0.5,
+                "CONNECTION_POOL_KWARGS": {"max_connections": 50},
+            },
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "todoapp",
+        }
+    }
+
+# When django-redis swallows an error (Redis down) it logs it here; the line is
+# rate-limited in LOGGING, so an outage is visible without flooding the log.
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
+DJANGO_REDIS_LOGGER = "api.cache"
+
+CATEGORY_CACHE_SECONDS = 300  # upper bound for stale data if an invalidation is missed
 
 # ----------------------------------------------------------------- validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -189,7 +236,10 @@ SLOW_REQUEST_MS = 1000  # a request this slow is logged as a WARNING
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {"traceback_only": {"()": "core.logging.OnlyWithTraceback"}},
+    "filters": {
+        "traceback_only": {"()": "core.logging.OnlyWithTraceback"},
+        "once_a_minute": {"()": "core.logging.RateLimited", "seconds": 60},
+    },
     "formatters": {
         "standard": {
             "format": "%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s"
@@ -204,6 +254,8 @@ LOGGING = {
         "api": {"handlers": ["console"], "level": "INFO", "propagate": False},
         # runserver's own access log repeats every request (with the raw query
         # string, tokens included); api.request already covers it.
+        # A broken Redis would log on every request; one line a minute is enough.
+        "api.cache": {"level": "WARNING", "filters": ["once_a_minute"], "propagate": True},
         "django.server": {"handlers": ["console"], "level": "CRITICAL", "propagate": False},
         # Crashes outside DRF views (admin, middleware) with their traceback.
         # Everything else is already covered by api.request / api.errors.

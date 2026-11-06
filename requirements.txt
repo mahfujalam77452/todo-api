@@ -1,6 +1,9 @@
 asgiref==3.13.0
 Django==5.2.19
 django-filter==26.2
+django-redis==7.0.0
 djangorestframework==3.18.3
 python-dotenv==1.2.4
+redis==8.1.0
 sqlparse==0.6.1
+typing_extensions==4.16.0
