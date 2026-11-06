@@ -34,3 +34,21 @@ class OnlyWithTraceback(logging.Filter):
 
     def filter(self, record):
         return record.exc_info is not None
+
+class RateLimited(logging.Filter):
+    """Let one record through every `seconds`, drop the rest.
+
+    During a Redis outage every request would otherwise log a traceback, twice.
+    """
+
+    def __init__(self, seconds=60):
+        super().__init__()
+        self.seconds = seconds
+        self._last = None
+
+    def filter(self, record):
+        now = time.monotonic()
+        if self._last is None or now - self._last >= self.seconds:
+            self._last = now
+            return True
+        return False

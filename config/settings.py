@@ -286,4 +286,4 @@ if LOG_FILE:
             "formatter": "standard",
         }
         for target in (LOGGING["root"], *LOGGING["loggers"].values()):
-            target["handlers"].append("file")
+            target.setdefault("handlers", []).append("file")
