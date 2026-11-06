@@ -15,6 +15,8 @@ router.register("todos", TodoViewSet, basename="todo")
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health", HealthView.as_view(), name="health"),
+    
+    path("api/auth/", include("accounts.urls")),
     path("api/", include(router.urls)),
     # Must stay last: any other /api/... URL is a JSON 404.
     path("api/<path:unknown>", ApiNotFoundView.as_view(), name="api-not-found"),
