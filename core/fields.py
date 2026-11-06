@@ -1,6 +1,8 @@
 import datetime
 import re
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -119,7 +121,7 @@ def ensure_in_year_window(value, min_year, max_year):
         raise serializers.ValidationError(
             f"Date must be between {min_year}-01-01 and {max_year}-12-31."
         )
-        
+
 class StrictIntegerChoiceField(serializers.ChoiceField):
     """Choice field for integer choices that accepts only real JSON integers.
 
@@ -136,4 +138,51 @@ class StrictIntegerChoiceField(serializers.ChoiceField):
     def to_internal_value(self, data):
         if isinstance(data, bool) or not isinstance(data, int):
             self.fail("invalid_choice", input=data)
+        return super().to_internal_value(data)
+
+class StrictEmailField(StrictCharField):
+    """An email address: cleaned like any single-line text, then lowercased.
+
+    The whole address is lowercased (not only the domain) because the project
+    treats "Alice@X.com" and "alice@x.com" as the same account.
+    With check_format=False (used by login) the shape is not judged: a wrong
+    address simply fails to log in, exactly like a wrong password.
+    """
+
+    default_error_messages = {"email": "Enter a valid email address."}
+    MAX_LOCAL_PART = 64  # RFC 5321; Django's validator does not enforce it
+
+    def __init__(self, *, check_format=True, **kwargs):
+        self.check_format = check_format
+        kwargs.setdefault("max_length", 254)  # the longest valid address
+        kwargs.setdefault("single_line", True)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data).lower()
+        if self.check_format:
+            try:
+                validate_email(value)
+            except DjangoValidationError:
+                self.fail("email")
+            if len(value.rpartition("@")[0]) > self.MAX_LOCAL_PART:
+                self.fail("email")
+        return value
+
+
+class StrictSecretField(serializers.CharField):
+    """A password or a token: JSON strings only and never trimmed or altered
+    (a password may legitimately start or end with a space). Write-only, and
+    capped so nobody can make the server hash a megabyte of text."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("trim_whitespace", False)
+        kwargs.setdefault("max_length", 128)
+        kwargs.setdefault("write_only", True)
+        kwargs.setdefault("style", {"input_type": "password"})
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, str):
+            self.fail("invalid")
         return super().to_internal_value(data)

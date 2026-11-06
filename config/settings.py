@@ -77,12 +77,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third party
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     # Local apps
     "core",
     "accounts",
     "categories",
     "todos",
+
 ]
 
 MIDDLEWARE = [
@@ -141,6 +143,29 @@ AUTH_USER_MODEL = "accounts.User"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+
+# ------------------------------------------------------------------------- JWT
+# JWT_SIGNING_KEY lets the token key differ from SECRET_KEY (rotate one without
+# the other). Without it SECRET_KEY signs the tokens.
+JWT_SIGNING_KEY = os.environ.get("JWT_SIGNING_KEY", "").strip() or SECRET_KEY
+if len(JWT_SIGNING_KEY) < 32:
+    raise ImproperlyConfigured("JWT_SIGNING_KEY (or SECRET_KEY) must be at least 32 characters.")
+
+SIMPLE_JWT = {
+    # Short-lived access token: it cannot be revoked, so it must expire quickly.
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    # Every refresh gives a new refresh token and revokes the old one, so a
+    # stolen refresh token stops working as soon as the owner uses theirs.
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": JWT_SIGNING_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+
 # ---------------------------------------------------------------------- cache
 # With REDIS_URL set (e.g. redis://localhost:6379/1) the cache is Redis, shared
 # by every worker and surviving restarts. Without it a per-process in-memory
@@ -191,7 +216,10 @@ CATEGORY_CACHE_SECONDS = 300  # upper bound for stale data if an invalidation is
 
 # ----------------------------------------------------------------- validation
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "OPTIONS": {"user_attributes": ("email", "name")},
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -218,8 +246,11 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["core.parsers.SafeJSONParser"],
     # Auth is added in Phase 4 (JWT + IsAuthenticated by default).
     # Empty list now so no Session/Basic auth sneaks in (it would turn 401s into 403s).
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+        # Secure by default: every endpoint needs a valid JWT unless a view opts out
+    # explicitly (register, login, refresh, logout, health). No Session/Basic
+    # authentication, which would also turn 401 answers into 403.
+    "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.SafeJWTAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
         # ?limit=&offset= on list endpoints (categories opt out, see CategoryViewSet)
     "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardLimitOffsetPagination",
