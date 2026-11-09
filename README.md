@@ -25,7 +25,8 @@ only by administrators.
 - Python 3.12+
 - Django 5.2
 - Django REST Framework
-- SQLite
+- PostgreSQL (production)
+- SQLite (local fallback)
 - Redis (optional for local development, recommended for production)
 - SimpleJWT
 - django-filter
@@ -138,6 +139,7 @@ curl https://todo-api-awz4.onrender.com/api/health
 | `SECRET_KEY` | Yes | Django secret key |
 | `DEBUG` | No | `true` for local development; use `false` in production |
 | `ALLOWED_HOSTS` | Production | Comma-separated allowed hosts |
+| `DATABASE_URL` | Production | PostgreSQL connection URL, for example `postgresql://user:password@host:5432/database` |
 | `LOG_FILE` | No | Optional rotating log file path |
 | `REDIS_URL` | No | Redis URL, for example `redis://localhost:6379/1` |
 | `JWT_SIGNING_KEY` | No | Separate JWT signing key; must be at least 32 characters |
@@ -145,6 +147,10 @@ curl https://todo-api-awz4.onrender.com/api/health
 
 If `REDIS_URL` is empty, the project uses per-process in-memory cache. The API
 continues to work, but cache and throttle state is not shared between workers.
+
+The application uses `DATABASE_URL` when it is set. For local development,
+leaving it empty uses the SQLite fallback database at `db.sqlite3`. Production
+deployments should always set `DATABASE_URL` to a managed PostgreSQL database.
 
 ## Redis setup
 
@@ -168,9 +174,9 @@ throttling fail open; the API itself remains available.
 
 ## Docker
 
-Docker Compose starts the Django web service and Redis together. The SQLite
-database and Redis append-only data use named volumes, so container restarts do
-not remove application data.
+Docker Compose starts the Django web service and Redis together. It is intended
+for local testing; production deployments should use PostgreSQL through
+`DATABASE_URL`.
 
 Create `.env` first and set a real `SECRET_KEY`:
 
@@ -230,9 +236,9 @@ To remove the database and Redis data as well, use this destructive command:
 docker compose down -v
 ```
 
-The image runs as a non-root `app` user. The SQLite volume is mounted at
-`/data/db.sqlite3`, and Redis is available to Django at
-`redis://redis:6379/1`.
+The image runs as a non-root `app` user, and Redis is available to Django at
+`redis://redis:6379/1`. To use PostgreSQL with Compose, set `DATABASE_URL` in
+`.env` to the connection URL of a reachable PostgreSQL instance.
 
 ### Run tests inside Docker
 
@@ -489,14 +495,11 @@ Open the HTML report at `htmlcov/index.html`.
 
 ## Known limitations
 
-- SQLite is suitable for this assignment and small deployments; PostgreSQL is
-  preferable for larger concurrent workloads.
-- `icontains` search on SQLite is not designed for large-scale full-text search.
-- Bengali and other locale-specific ordering uses SQLite/code-point ordering,
-  not linguistic collation.
+- Local development has a SQLite fallback; production uses PostgreSQL.
+- PostgreSQL should be used for concurrent or horizontally scaled deployments.
 - Without Redis, throttle counters and cache entries are process-local.
-- The current repository does not yet include Docker/Compose deployment files;
-  local setup uses the Python virtual environment and optional Redis.
+- Docker/Compose is available for local container-based testing; native Python
+  setup is the primary development workflow.
 
 ## Security notes
 
