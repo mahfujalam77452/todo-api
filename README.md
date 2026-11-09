@@ -34,7 +34,14 @@ only by administrators.
 
 ## Quick start
 
-### 1. Create and activate a virtual environment
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/mahfujalam77452/todo-api.git
+cd todo-api
+```
+
+### 2. Create and activate a virtual environment
 
 ```bash
 python -m venv venv
@@ -47,13 +54,13 @@ On Windows PowerShell:
 venv\Scripts\Activate.ps1
 ```
 
-### 2. Install dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment variables
+### 4. Configure environment variables
 
 ```bash
 cp .env.example .env
@@ -67,13 +74,13 @@ python -c "from django.core.management.utils import get_random_secret_key as g; 
 
 Put the generated value in `.env` as `SECRET_KEY`. Never commit `.env`.
 
-### 4. Apply migrations
+### 5. Apply migrations
 
 ```bash
 python manage.py migrate
 ```
 
-### 5. Create an admin user
+### 6. Create an admin user
 
 ```bash
 python manage.py createsuperuser
@@ -81,7 +88,7 @@ python manage.py createsuperuser
 
 The command asks for an email address, name, and password.
 
-### 6. Start the development server
+### 7. Start the development server
 
 ```bash
 python manage.py runserver
