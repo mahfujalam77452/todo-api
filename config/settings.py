@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third party
     "rest_framework",
+    "drf_spectacular",
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     # Local apps
@@ -285,6 +286,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.SafeJWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
         # ?limit=&offset= on list endpoints (categories opt out, see CategoryViewSet)
     "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardLimitOffsetPagination",
         # Rate limits (see THROTTLE_RATES above). Authentication and permissions run
@@ -297,6 +299,31 @@ REST_FRAMEWORK = {
     "NUM_PROXIES": NUM_PROXIES,
     # ?status=... etc., defined per view in a FilterSet
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+}
+
+# ---------------------------------------------------------------- API schema/docs
+SPECTACULAR_SETTINGS = {
+    "TITLE": "TODO List REST API",
+    "DESCRIPTION": (
+        "JWT-authenticated TODO API. Users can manage only their own todos; "
+        "categories are globally readable and admin-managed."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": r"/api",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": False,
+    "SERVE_PERMISSIONS": [],
+    "AUTHENTICATION_WHITELIST": [
+        "core.authentication.SafeJWTAuthentication",
+    ],
+    "SECURITY": [{"BearerAuth": []}],
+    "TAGS": [
+        {"name": "Authentication", "description": "Register and manage JWT tokens."},
+        {"name": "Todos", "description": "Private todos owned by the authenticated user."},
+        {"name": "Categories", "description": "Global categories; writes require admin permissions."},
+        {"name": "System", "description": "Health and API documentation endpoints."},
+    ],
 }
 
 
