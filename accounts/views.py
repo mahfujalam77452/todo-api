@@ -5,6 +5,9 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.throttling import ScopedRateThrottle
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+
+from core.schema import ErrorResponseSerializer, ValidationErrorResponseSerializer
 from .serializers import (
     LoginSerializer,
     LogoutSerializer,
@@ -25,6 +28,18 @@ class RegisterView(CreateAPIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "register"
 
+    @extend_schema(
+        tags=["Authentication"],
+        responses={
+            201: RegisterSerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            429: OpenApiResponse(ErrorResponseSerializer),
+        },
+        auth=[],
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
@@ -32,6 +47,18 @@ class LoginView(TokenObtainPairView):
     permission_classes = []
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
+
+    @extend_schema(
+        tags=["Authentication"],
+        responses={
+            200: LoginSerializer,
+            401: OpenApiResponse(ErrorResponseSerializer),
+            429: OpenApiResponse(ErrorResponseSerializer),
+        },
+        auth=[],
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 class RefreshView(TokenRefreshView):
@@ -43,6 +70,18 @@ class RefreshView(TokenRefreshView):
     permission_classes = []
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "token"
+
+    @extend_schema(
+        tags=["Authentication"],
+        responses={
+            200: RefreshSerializer,
+            401: OpenApiResponse(ErrorResponseSerializer),
+            429: OpenApiResponse(ErrorResponseSerializer),
+        },
+        auth=[],
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 class LogoutView(GenericAPIView):
@@ -59,6 +98,17 @@ class LogoutView(GenericAPIView):
     permission_classes = []
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "token"
+
+    @extend_schema(
+        tags=["Authentication"],
+        responses={
+            204: None,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            401: OpenApiResponse(ErrorResponseSerializer),
+            429: OpenApiResponse(ErrorResponseSerializer),
+        },
+        auth=[],
+    )
 
     def get_authenticate_header(self, request):
         # With no authentication classes DRF has no WWW-Authenticate header to
