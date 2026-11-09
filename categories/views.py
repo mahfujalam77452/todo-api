@@ -5,14 +5,16 @@ from rest_framework.viewsets import ModelViewSet
 
 from . import cache as category_cache
 from .models import Category
+from .permissions import CategoryPermissions
 from .serializers import CategorySerializer
 
 
 class CategoryViewSet(ModelViewSet):
-    """CRUD for categories. Write access is restricted to admins in Task 4.5."""
+    """Categories are global: every user can read them, only admins can change them."""
 
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [CategoryPermissions]
     # A small, admin-managed list that dropdowns need in full: not paginated.
     pagination_class = None
     # Plain ASCII digits, no leading zero, at most 18 digits (fits SQLite's
