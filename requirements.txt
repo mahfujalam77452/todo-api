@@ -9,3 +9,11 @@ python-dotenv==1.2.4
 redis==8.1.0
 sqlparse==0.6.1
 typing_extensions==4.16.0
+pytest==8.4.2
+pytest-django==4.11.1
+factory_boy==3.3.3
+freezegun==1.5.5
+coverage==7.10.6
+drf-spectacular==0.28.0
+PyYAML==6.0.3
+uritemplate==4.2.0
