@@ -2,8 +2,10 @@ from django.db.models import F
 from django.db.models.functions import Lower
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.viewsets import ModelViewSet
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 
 from core.filters import StrictOrderingFilter, StrictSearchFilter
+from core.schema import ErrorResponseSerializer, ValidationErrorResponseSerializer
 
 from .filters import TodoFilter
 from .models import Todo
@@ -23,6 +25,37 @@ def _nulls_last(field):
     return build
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=["Todos"],
+        responses={200: TodoSerializer, 400: OpenApiResponse(ValidationErrorResponseSerializer)},
+        description="List only the authenticated user's todos.",
+    ),
+    create=extend_schema(
+        tags=["Todos"],
+        responses={
+            201: TodoSerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+        },
+    ),
+    retrieve=extend_schema(
+        tags=["Todos"],
+        responses={200: TodoSerializer, 404: OpenApiResponse(ErrorResponseSerializer)},
+    ),
+    partial_update=extend_schema(
+        tags=["Todos"],
+        responses={
+            200: TodoSerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+        },
+    ),
+    destroy=extend_schema(
+        tags=["Todos"],
+        responses={204: None, 404: OpenApiResponse(ErrorResponseSerializer)},
+        description="Hard-delete one of the authenticated user's todos.",
+    ),
+)
 class TodoViewSet(ModelViewSet):
     # Deliberately empty: the real queryset is get_queryset(), which is limited
     # to the signed-in user. An accidental use of `queryset` can then never
