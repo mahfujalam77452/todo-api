@@ -1,0 +1,820 @@
+openapi: 3.0.3
+info:
+  title: TODO List REST API
+  version: 1.0.0
+  description: JWT-authenticated TODO API. Users can manage only their own todos;
+    categories are globally readable and admin-managed.
+paths:
+  /api/health:
+    get:
+      operationId: health_retrieve
+      description: Liveness probe. This endpoint does not require authentication.
+      tags:
+      - System
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+          description: ''
+  /api/auth/register:
+    post:
+      operationId: auth_register_create
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Register'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/auth/login:
+    post:
+      operationId: auth_login_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/auth/token/refresh:
+    post:
+      operationId: auth_token_refresh_create
+      description: |-
+        Exchange a refresh token for a new access token and a new refresh token
+        (the old refresh token stops working).
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refresh'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/auth/logout:
+    post:
+      operationId: auth_logout_create
+      description: |-
+        Blacklist a refresh token.
+
+        Holding the refresh token is the proof, so no access token is needed: a
+        user whose access token already expired can still log out. Access tokens
+        already issued stay valid until they expire (15 minutes); that is how
+        JWTs work.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/categories:
+    post:
+      operationId: categories_create
+      description: 'Categories are global: every user can read them, only admins can
+        change them.'
+      tags:
+      - Categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    get:
+      operationId: categories_list
+      description: List all globally available categories. The response is cached.
+      tags:
+      - Categories
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+          description: ''
+  /api/categories/{id}:
+    patch:
+      operationId: categories_partial_update
+      description: 'Categories are global: every user can read them, only admins can
+        change them.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryRequest'
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    get:
+      operationId: categories_retrieve
+      description: 'Categories are global: every user can read them, only admins can
+        change them.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Categories
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    delete:
+      operationId: categories_destroy
+      description: 'Categories are global: every user can read them, only admins can
+        change them.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Categories
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/todos:
+    post:
+      operationId: todos_create
+      tags:
+      - Todos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TodoRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+    get:
+      operationId: todos_list
+      description: List only the authenticated user's todos.
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: 'Category id. Repeat for several: ?category=1&category=2'
+      - in: query
+        name: due_after
+        schema:
+          type: string
+        description: due on or after this date and time, e.g. 2026-12-01T18:00:00+06:00
+      - in: query
+        name: due_before
+        schema:
+          type: string
+        description: due on or before this date and time, e.g. 2026-12-01T18:00:00+06:00
+      - in: query
+        name: has_category
+        schema:
+          type: string
+        description: 'true: only todos with a category, false: only todos without
+          one'
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - in: query
+        name: overdue
+        schema:
+          type: string
+        description: 'true: not completed and past its due date; false: everything
+          else'
+      - in: query
+        name: priority
+        schema:
+          type: string
+        description: '1 (low), 2 (medium) or 3 (high). Repeat for several: ?priority=2&priority=3'
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - completed
+          - pending
+        description: |-
+          completed or pending
+
+          * `completed` - completed
+          * `pending` - pending
+      tags:
+      - Todos
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTodoList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+  /api/todos/{id}:
+    patch:
+      operationId: todos_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Todos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTodoRequest'
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    get:
+      operationId: todos_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Todos
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    delete:
+      operationId: todos_destroy
+      description: Hard-delete one of the authenticated user's todos.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Todos
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+components:
+  schemas:
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 50
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+    CategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+      required:
+      - name
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: integer
+      required:
+      - code
+      - error
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+      - status
+    LoginRequest:
+      type: object
+      description: |-
+        email + password in; access, refresh and the user out.
+
+        A wrong email, a wrong password and a deactivated account all give the same
+        401, so the answer does not reveal which addresses are registered.
+      properties:
+        email:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+      required:
+      - email
+      - password
+    LogoutRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 4096
+      required:
+      - refresh
+    PaginatedTodoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Todo'
+    PatchedCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+    PatchedTodoRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          default: ''
+          maxLength: 10000
+        is_completed:
+          type: boolean
+          default: false
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          default: 2
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        category:
+          type: integer
+          nullable: true
+    PriorityEnum:
+      enum:
+      - 1
+      - 2
+      - 3
+      type: integer
+      description: |-
+        * `1` - Low
+        * `2` - Medium
+        * `3` - High
+    Refresh:
+      type: object
+      description: |-
+        simplejwt looks the user up with .get(): for a deleted user that raised
+        DoesNotExist, which became a 500. A deleted user is simply not logged in.
+      properties:
+        refresh:
+          type: string
+        access:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    RefreshRequest:
+      type: object
+      description: |-
+        simplejwt looks the user up with .get(): for a deleted user that raised
+        DoesNotExist, which became a 500. A deleted user is simply not logged in.
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    Register:
+      type: object
+      description: |-
+        name, email and password in; id, name and email out (never the password).
+
+        Only these three fields exist, so a body with is_staff, is_superuser,
+        is_active, id or date_joined cannot change anything: it is simply ignored.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        email:
+          type: string
+          maxLength: 254
+      required:
+      - email
+      - id
+      - name
+    RegisterRequest:
+      type: object
+      description: |-
+        name, email and password in; id, name and email out (never the password).
+
+        Only these three fields exist, so a body with is_staff, is_superuser,
+        is_active, id or date_joined cannot change anything: it is simply ignored.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        email:
+          type: string
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+      required:
+      - email
+      - name
+      - password
+    Todo:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          default: ''
+          maxLength: 10000
+        is_completed:
+          type: boolean
+          default: false
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          default: 2
+        priority_display:
+          type: string
+          readOnly: true
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        category:
+          type: integer
+          nullable: true
+        category_name:
+          type: string
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_name
+      - created_at
+      - id
+      - priority_display
+      - title
+      - updated_at
+    TodoRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          default: ''
+          maxLength: 10000
+        is_completed:
+          type: boolean
+          default: false
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          default: 2
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        category:
+          type: integer
+          nullable: true
+      required:
+      - title
+    ValidationErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: integer
+        details:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      required:
+      - code
+      - details
+      - error
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+- name: Authentication
+  description: Register and manage JWT tokens.
+- name: Todos
+  description: Private todos owned by the authenticated user.
+- name: Categories
+  description: Global categories; writes require admin permissions.
+- name: System
+  description: Health and API documentation endpoints.
