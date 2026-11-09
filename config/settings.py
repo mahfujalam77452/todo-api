@@ -43,7 +43,17 @@ def env_bool(name: str, default: bool = False) -> bool:
     if value in {"0", "false", "no", "off"}:
         return False
     raise ImproperlyConfigured(f"{name} must be a boolean (true/false), got {raw!r}.")
-
+def env_int(name: str, default: int, minimum: int = 0) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        raise ImproperlyConfigured(f"{name} must be a whole number, got {raw!r}.") from None
+    if value < minimum:
+        raise ImproperlyConfigured(f"{name} must be at least {minimum}, got {value}.")
+    return value
 
 def env_list(name: str, default: str = "") -> list[str]:
     raw = os.environ.get(name, default)
@@ -239,6 +249,29 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # Reject request bodies bigger than this (judged by the Content-Length header).
 # The largest valid todo is ~45 KB (10,000 characters x up to 4 bytes + title).
 DATA_UPLOAD_MAX_MEMORY_SIZE = 256 * 1024
+
+# ----------------------------------------------------------------- rate limiting
+# How many reverse proxies / load balancers sit between the internet and this
+# app. Requests are counted per client IP, and the IP comes from REMOTE_ADDR.
+# With 0 (the default) the X-Forwarded-For header is ignored, which is right
+# when the app is reached directly: otherwise anybody could send a different
+# X-Forwarded-For with every request and never hit a limit (DRF's own default
+# trusts the whole header). Behind one proxy set NUM_PROXIES=1, and so on.
+NUM_PROXIES = env_int("NUM_PROXIES", 0)
+
+# The counters live in the cache: Redis when REDIS_URL is set (shared by every
+# worker), otherwise memory (each worker counts on its own, so with N workers
+# the real limit is up to N times higher). If Redis is down, limits stop being
+# enforced rather than the API failing.
+THROTTLE_RATES = {
+    "anon": "20/min",       # unauthenticated requests to endpoints without their own scope
+    "user": "100/min",      # every signed-in user, counted per user, not per IP
+    "login": "5/min",       # per IP: slows down password guessing
+    "register": "5/hour",   # per IP: slows down account creation and email probing
+    "token": "30/min",      # per IP: refresh and logout
+}
+
+
 # ------------------------------------------------------------ Django REST Framework
 REST_FRAMEWORK = {
     # JSON only: no browsable HTML API, and form/plain-text bodies get 415.
@@ -254,6 +287,14 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
         # ?limit=&offset= on list endpoints (categories opt out, see CategoryViewSet)
     "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardLimitOffsetPagination",
+        # Rate limits (see THROTTLE_RATES above). Authentication and permissions run
+    # first, so a 401 or 403 does not use up the caller's allowance.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": THROTTLE_RATES,
+    "NUM_PROXIES": NUM_PROXIES,
     # ?status=... etc., defined per view in a FilterSet
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }

@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-
+from rest_framework.throttling import ScopedRateThrottle
 from .serializers import (
     LoginSerializer,
     LogoutSerializer,
@@ -22,12 +22,16 @@ class RegisterView(CreateAPIView):
     serializer_class = RegisterSerializer
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
 
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
 
 class RefreshView(TokenRefreshView):
@@ -37,6 +41,8 @@ class RefreshView(TokenRefreshView):
     serializer_class = RefreshSerializer
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "token"
 
 
 class LogoutView(GenericAPIView):
@@ -51,6 +57,8 @@ class LogoutView(GenericAPIView):
     serializer_class = LogoutSerializer
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "token"
 
     def get_authenticate_header(self, request):
         # With no authentication classes DRF has no WWW-Authenticate header to
