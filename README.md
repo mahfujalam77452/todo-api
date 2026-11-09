@@ -104,6 +104,33 @@ Start the server and open:
 
 - OpenAPI JSON/YAML response: `http://127.0.0.1:8000/api/schema`
 
+### Deployed API
+
+The live API is available at:
+
+```text
+https://todo-api-awz4.onrender.com
+```
+
+Open the following URLs in a browser:
+
+- Swagger UI: https://todo-api-awz4.onrender.com/api/docs
+
+- OpenAPI schema: https://todo-api-awz4.onrender.com/api/schema
+- Health check: https://todo-api-awz4.onrender.com/api/health
+
+The health endpoint should return:
+
+```json
+{"status": "ok"}
+```
+
+You can also check it from a terminal:
+
+```bash
+curl https://todo-api-awz4.onrender.com/api/health
+```
+
 ## Environment variables
 
 | Variable | Required | Description |
