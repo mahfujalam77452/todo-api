@@ -96,6 +96,14 @@ python manage.py runserver
 
 The API is available at `http://127.0.0.1:8000`.
 
+## API documentation
+
+Start the server and open:
+
+- Swagger UI: `http://127.0.0.1:8000/api/docs`
+
+- OpenAPI JSON/YAML response: `http://127.0.0.1:8000/api/schema`
+
 ## Environment variables
 
 | Variable | Required | Description |
@@ -225,13 +233,7 @@ The test service uses an isolated temporary SQLite database and in-memory
 cache, so it does not modify the development database or depend on a locally
 running Redis.
 
-## API documentation
 
-Start the server and open:
-
-- Swagger UI: `http://127.0.0.1:8000/api/docs`
-- ReDoc: `http://127.0.0.1:8000/api/redoc`
-- OpenAPI JSON/YAML response: `http://127.0.0.1:8000/api/schema`
 
 The committed schema is [schema.yml](./schema.yml). Validate or regenerate it:
 
