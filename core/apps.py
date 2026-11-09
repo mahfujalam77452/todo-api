@@ -6,6 +6,7 @@ class CoreConfig(AppConfig):
     name = "core"
 
     def ready(self):
+        from . import spectacular  # noqa: F401
         from .logging import install_record_factory
 
         install_record_factory()

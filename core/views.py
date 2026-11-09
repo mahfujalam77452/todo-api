@@ -2,6 +2,9 @@ from django.http import JsonResponse
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema
+
+from .schema import HealthResponseSerializer
 
 
 class HealthView(APIView):
@@ -11,6 +14,12 @@ class HealthView(APIView):
     permission_classes = []
     throttle_classes = []  # monitors and load balancers poll this all the time
 
+    @extend_schema(
+        tags=["System"],
+        responses={200: HealthResponseSerializer},
+        auth=[],
+        description="Liveness probe. This endpoint does not require authentication.",
+    )
     def get(self, request):
         return Response({"status": "ok"})
 
