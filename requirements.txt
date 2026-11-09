@@ -17,3 +17,5 @@ coverage==7.10.6
 drf-spectacular==0.28.0
 PyYAML==6.0.3
 uritemplate==4.2.0
+gunicorn==23.0.0
+whitenoise==6.9.0

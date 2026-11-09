@@ -101,6 +101,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "core.middleware.RequestLoggingMiddleware",  # first: times the whole request
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -135,7 +136,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": os.environ.get("DB_PATH", str(BASE_DIR / "db.sqlite3")),
         "OPTIONS": {
             # Wait up to 20s for a lock instead of failing at once with
             # "database is locked".
