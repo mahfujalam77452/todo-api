@@ -7,7 +7,7 @@ All environment-specific values come from environment variables
 import os
 import sys
 from pathlib import Path
-
+from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 

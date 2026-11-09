@@ -24,10 +24,10 @@ def _nulls_last(field):
 
 
 class TodoViewSet(ModelViewSet):
-    # select_related: category_name is read for every row, so fetch it with the
-    # todos in one query instead of one extra query per todo (N+1).
-    # Ordering comes from Todo.Meta: newest first, id as the tie-breaker.
-    queryset = Todo.objects.select_related("category")
+    # Deliberately empty: the real queryset is get_queryset(), which is limited
+    # to the signed-in user. An accidental use of `queryset` can then never
+    # leak anyone's todos.
+    queryset = Todo.objects.none()
     serializer_class = TodoSerializer
     # Plain ASCII digits, no leading zero, at most 18 digits (fits SQLite's
     # 64-bit integer). Everything else (abc, 0, 007, Bangla digits) is a 404.
@@ -44,6 +44,20 @@ class TodoViewSet(ModelViewSet):
         "title": _title_ci,
         "due_date": _nulls_last("due_date"),
     }
+
+    def get_queryset(self):
+        """Only the caller's own todos, for every action. Somebody else's todo
+        is a 404, exactly like one that does not exist, so ids cannot be probed.
+        Admins get no exception: they have no access to anyone's todos.
+
+        select_related: category_name is read for every row, so fetch it with
+        the todos in one query instead of one extra query per todo (N+1).
+        Ordering comes from Todo.Meta: newest first, id as the tie-breaker."""
+        return Todo.objects.filter(user=self.request.user).select_related("category")
+
+    def perform_create(self, serializer):
+        # The owner is never taken from the request body.
+        serializer.save(user=self.request.user)
 
     def filter_queryset(self, queryset):
         # Filters belong to the list only. Without this, GET /todos/5?status=pending

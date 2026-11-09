@@ -31,8 +31,6 @@ class Todo(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="todos",
-        null=True,
-        blank=True,
         # The composite indexes below all start with user, so a separate
         # user_id index would be redundant (it would only slow writes down).
         db_index=False,
@@ -76,6 +74,7 @@ class Todo(models.Model):
                 name="todo_priority_valid",
             ),
         ]
-
     def __str__(self):
-        return self.title
+        
+        return f"Todo #{self.pk}"
+    

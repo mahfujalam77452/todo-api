@@ -90,7 +90,13 @@ class TodoSerializer(serializers.ModelSerializer):
             return instance
 
         now = timezone.now()
-        rows = Todo.objects.filter(pk=instance.pk).update(**changed, updated_at=now)
+        
+        # user_id in the filter: even if this were ever called with somebody
+        # else's instance, it could not write to a todo the caller does not own.
+        rows = Todo.objects.filter(pk=instance.pk, user_id=instance.user_id).update(
+            **changed, updated_at=now
+        )
+        
         if rows == 0:
             # Deleted by someone else between our read and this write.
             raise NotFound()

@@ -1,20 +1,17 @@
 from django.contrib import admin
-from django.db.models import Count
 
 from .models import Category
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "todo_count", "created_at")
+    """Admins manage the list of categories and nothing else: they have no
+    relationship with todos (no todo is shown, listed or counted here).
+
+    Deleting a category keeps every todo; the todos just lose that category.
+    """
+
+    list_display = ("name", "created_at")
     search_fields = ("name",)
     ordering = ("name",)
     readonly_fields = ("created_at",)
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).annotate(_todo_count=Count("todos"))
-
-    @admin.display(description="Todos using it", ordering="_todo_count")
-    def todo_count(self, obj):
-        # Deleting a category does NOT delete these todos; it only clears their category.
-        return obj._todo_count
