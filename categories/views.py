@@ -2,13 +2,51 @@ from django.conf import settings
 from django.core.cache import cache
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 
 from . import cache as category_cache
 from .models import Category
 from .permissions import CategoryPermissions
 from .serializers import CategorySerializer
+from core.schema import ErrorResponseSerializer, ValidationErrorResponseSerializer
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=["Categories"],
+        responses={200: CategorySerializer},
+        description="List all globally available categories. The response is cached.",
+    ),
+    retrieve=extend_schema(
+        tags=["Categories"],
+        responses={200: CategorySerializer, 404: OpenApiResponse(ErrorResponseSerializer)},
+    ),
+    create=extend_schema(
+        tags=["Categories"],
+        responses={
+            201: CategorySerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            403: OpenApiResponse(ErrorResponseSerializer),
+        },
+    ),
+    partial_update=extend_schema(
+        tags=["Categories"],
+        responses={
+            200: CategorySerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            403: OpenApiResponse(ErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+        },
+    ),
+    destroy=extend_schema(
+        tags=["Categories"],
+        responses={
+            204: None,
+            403: OpenApiResponse(ErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+        },
+    ),
+)
 class CategoryViewSet(ModelViewSet):
     """Categories are global: every user can read them, only admins can change them."""
 
