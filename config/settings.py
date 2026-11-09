@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+import dj_database_url
 
 # Django 5.2 needs Python 3.10+. Fail early with a clear message.
 if sys.version_info < (3, 10):
@@ -133,21 +134,14 @@ WSGI_APPLICATION = "config.wsgi.application"
 # ------------------------------------------------------------------- database
 # SQLite. (Connection tuning + custom user model are done in Task 1.2.)
 # SQLite, tuned for a web app that may run several workers.
+# ------------------------------------------------------------------- database
+# PostgreSQL in production, SQLite in local development.
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.environ.get("DB_PATH", str(BASE_DIR / "db.sqlite3")),
-        "OPTIONS": {
-            # Wait up to 20s for a lock instead of failing at once with
-            # "database is locked".
-            "timeout": 20,
-            # WAL: readers don't block the writer (and vice versa).
-            "init_command": "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;",
-            # Take the write lock at BEGIN, so a transaction can't fail halfway
-            # while upgrading from read to write lock.
-            "transaction_mode": "IMMEDIATE",
-        },
-    }
+    "default": dj_database_url.config(
+        default="sqlite:///" + str(BASE_DIR / "db.sqlite3"),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 # Custom user (email login). Must be set before the very first `migrate`.
