@@ -10,9 +10,21 @@ class Todo(models.Model):
         MEDIUM = 2, "Medium"
         HIGH = 3, "High"
 
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        IN_PROGRESS = "in_progress", "In progress"
+        COMPLETED = "completed", "Completed"
+
+    class AssignmentStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        REJECTED = "rejected", "Rejected"
+
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
-    is_completed = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
     due_date = models.DateTimeField(null=True, blank=True)
     priority = models.PositiveSmallIntegerField(
         choices=Priority.choices, default=Priority.MEDIUM
@@ -26,41 +38,65 @@ class Todo(models.Model):
         null=True,
         blank=True,
     )
-    # null=True only until Phase 4 (auth). It becomes non-null in Task 4.4.
-    user = models.ForeignKey(
+    assigner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="todos",
-        # The composite indexes below all start with user, so a separate
-        # user_id index would be redundant (it would only slow writes down).
+        related_name="created_todos",
         db_index=False,
     )
+    assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="assigned_todos",
+        null=True,
+        blank=True,
+    )
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.SET_NULL,
+        related_name="todos",
+        null=True,
+        blank=True,
+    )
+    assignment_status = models.CharField(
+        max_length=20,
+        choices=AssignmentStatus.choices,
+        null=True,
+        blank=True,
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]
-        # Every query of the API is scoped to one user , so every
-        # index starts with `user`. Each one serves a real query shape:
+        # List queries are scoped to either the assigner or assignee.
         indexes = [
-            # default list: newest first, and the user's total count
-            models.Index(fields=["user", "-created_at", "-id"], name="todo_user_created_idx"),
-            # ?status=completed|pending
             models.Index(
-                fields=["user", "is_completed", "-created_at", "-id"], name="todo_user_status_idx"
+                fields=["assigner", "-created_at", "-id"],
+                name="todo_assigner_created_idx",
             ),
-            # ?priority=3
             models.Index(
-                fields=["user", "priority", "-created_at", "-id"], name="todo_user_priority_idx"
+                fields=["assigner", "status", "-created_at", "-id"],
+                name="todo_assigner_status_idx",
             ),
-            # ?overdue=true: only open todos with a due date, so the index stays small
             models.Index(
-                fields=["user", "due_date"],
-                condition=Q(is_completed=False, due_date__isnull=False),
-                name="todo_user_open_due_idx",
+                fields=["assigner", "priority", "-created_at", "-id"],
+                name="todo_assigner_priority_idx",
             ),
-            # ?ordering=title (case-insensitive)
-            models.Index(F("user"), Lower("title"), name="todo_user_title_ci_idx"),
+            models.Index(
+                fields=["assigner", "due_date"],
+                condition=Q(due_date__isnull=False) & ~Q(status="completed"),
+                name="todo_assigner_open_due_idx",
+            ),
+            models.Index(
+                F("assigner"), Lower("title"), name="todo_assigner_title_idx"
+            ),
+            models.Index(
+                fields=["assignee", "-created_at", "-id"],
+                name="todo_assignee_created_idx",
+            ),
         ]
         constraints = [
             # SQLite does NOT enforce VARCHAR(255); enforce it ourselves.
@@ -72,6 +108,22 @@ class Todo(models.Model):
             models.CheckConstraint(
                 condition=Q(priority__in=[1, 2, 3]),
                 name="todo_priority_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(status__in=["pending", "in_progress", "completed"]),
+                name="todo_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(assignment_status__in=["pending", "accepted", "rejected"])
+                | Q(assignment_status__isnull=True),
+                name="todo_assignment_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(assignee__isnull=True, assignment_status__isnull=True)
+                    | Q(assignee__isnull=False, assignment_status__isnull=False)
+                ),
+                name="todo_assignment_pair_valid",
             ),
         ]
     def __str__(self):
