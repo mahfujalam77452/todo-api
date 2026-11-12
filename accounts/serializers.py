@@ -8,6 +8,7 @@ from rest_framework_simplejwt.serializers import (
     TokenObtainPairSerializer,
     TokenRefreshSerializer,
 )
+from drf_spectacular.utils import extend_schema_field
 
 from core.exceptions import Conflict
 from core.fields import (
@@ -80,6 +81,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Role must be either 'member' or 'admin'.")
         return value
 
+    @extend_schema_field(serializers.DictField(allow_null=True))
     def get_team(self, obj):
         try:
             membership = obj.membership
