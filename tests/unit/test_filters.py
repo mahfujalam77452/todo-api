@@ -15,8 +15,8 @@ from tests.factories import TodoFactory
 
 @pytest.mark.django_db
 def test_status_filter_selects_completed_and_pending():
-    completed = TodoFactory(is_completed=True)
-    pending = TodoFactory(is_completed=False)
+    completed = TodoFactory(status="completed")
+    pending = TodoFactory(status="pending")
     queryset = Todo.objects.all()
 
     assert list(TodoFilter(QueryDict("status=Completed"), queryset).qs) == [completed]
@@ -28,7 +28,7 @@ def test_status_filter_selects_completed_and_pending():
 def test_overdue_filter_excludes_completed_and_missing_due_dates():
     utc = timezone.get_fixed_timezone(0)
     overdue = TodoFactory(due_date=datetime(2026, 5, 31, 12, 0, tzinfo=utc))
-    TodoFactory(due_date=datetime(2026, 5, 31, 12, 0, tzinfo=utc), is_completed=True)
+    TodoFactory(due_date=datetime(2026, 5, 31, 12, 0, tzinfo=utc), status="completed")
     TodoFactory(due_date=None)
     TodoFactory(due_date=datetime(2026, 6, 2, 12, 0, tzinfo=utc))
 

@@ -22,7 +22,7 @@ def test_deleting_category_sets_todo_category_to_null():
 @pytest.mark.django_db
 def test_deleting_user_cascades_to_owned_todos():
     user = UserFactory()
-    todo = TodoFactory(user=user)
+    todo = TodoFactory(assigner=user)
     todo_id = todo.pk
 
     user.delete()
@@ -33,12 +33,12 @@ def test_deleting_user_cascades_to_owned_todos():
 @pytest.mark.django_db
 def test_default_ordering_uses_id_as_tie_breaker():
     user = UserFactory()
-    first = TodoFactory(user=user)
-    second = TodoFactory(user=user)
+    first = TodoFactory(assigner=user)
+    second = TodoFactory(assigner=user)
     same_time = timezone.make_aware(datetime(2026, 1, 1, 12, 0))
     Todo.objects.filter(pk__in=[first.pk, second.pk]).update(created_at=same_time)
 
-    assert list(Todo.objects.filter(user=user))[:2] == [second, first]
+    assert list(Todo.objects.filter(assigner=user))[:2] == [second, first]
 
 
 @pytest.mark.django_db

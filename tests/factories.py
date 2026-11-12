@@ -52,9 +52,9 @@ class TodoFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Todo
 
-    user = factory.SubFactory(UserFactory)
+    assigner = factory.SubFactory(UserFactory)
     title = factory.Sequence(lambda n: f"Todo {n}")
     description = ""
-    is_completed = False
+    status = Todo.Status.PENDING
     priority = Todo.Priority.MEDIUM
     due_date = None

@@ -94,28 +94,28 @@ def test_todo_defaults_priority_and_completion():
 
     assert serializer.is_valid(), serializer.errors
     assert serializer.validated_data["priority"] == Todo.Priority.MEDIUM
-    assert serializer.validated_data["is_completed"] is False
+    assert serializer.validated_data["status"] == Todo.Status.PENDING
 
 
 @pytest.mark.django_db
-def test_todo_rejects_non_boolean_completion_values():
-    for value in (None, "yes", "1", 1):
+def test_todo_rejects_invalid_status_values():
+    for value in (None, "unknown", "COMPLETED", 1):
         errors = serializer_errors(
-            TodoSerializer(data={"title": "Task", "is_completed": value})
+            TodoSerializer(data={"title": "Task", "status": value})
         )
-        assert "is_completed" in errors
+        assert "status" in errors
 
 
 @pytest.mark.django_db
 def test_todo_ignores_read_only_and_owner_fields():
-    owner = TodoFactory().user
+    owner = TodoFactory().assigner
     serializer = TodoSerializer(
         data={
             "title": "Task",
             "id": 999999,
             "created_at": "2026-01-01T00:00:00Z",
             "updated_at": "2026-01-01T00:00:00Z",
-            "user": owner.pk,
+            "assigner": owner.pk,
         }
     )
 
@@ -123,14 +123,14 @@ def test_todo_ignores_read_only_and_owner_fields():
     assert "id" not in serializer.validated_data
     assert "created_at" not in serializer.validated_data
     assert "updated_at" not in serializer.validated_data
-    assert "user" not in serializer.validated_data
+    assert "assigner" not in serializer.validated_data
 
 
 @pytest.mark.django_db
 def test_same_todo_title_is_allowed_for_same_user():
-    owner = TodoFactory().user
-    first = TodoFactory(user=owner, title="Same title")
-    second = TodoFactory(user=owner, title="Same title")
+    owner = TodoFactory().assigner
+    first = TodoFactory(assigner=owner, title="Same title")
+    second = TodoFactory(assigner=owner, title="Same title")
 
     assert first.pk != second.pk
 
