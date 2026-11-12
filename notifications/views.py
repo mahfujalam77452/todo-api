@@ -24,6 +24,7 @@ from .serializers import (
     ),
 )
 class NotificationViewSet(mixins.ListModelMixin, GenericViewSet):
+    queryset = Notification.objects.none()
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
@@ -31,6 +32,8 @@ class NotificationViewSet(mixins.ListModelMixin, GenericViewSet):
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Notification.objects.none()
         queryset = Notification.objects.filter(recipient=self.request.user)
         is_read = self.request.query_params.get("is_read")
         if is_read is not None:
