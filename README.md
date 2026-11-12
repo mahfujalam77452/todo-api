@@ -8,8 +8,10 @@ only by administrators.
 ## Features
 
 - Email-based custom user model
+- Workspace roles (`member` and `admin`) with team memberships
 - JWT access/refresh tokens with refresh-token blacklist logout
 - Private per-user TODOs
+- Authenticated profile, team list/member list, and admin user-management APIs
 - Categories with case-insensitive unique names
 - Partial updates with `PATCH`; `PUT` is intentionally disabled
 - Filtering, search, ordering, and limit/offset pagination
@@ -273,6 +275,26 @@ The committed schema is [schema.yml](./schema.yml). Validate or regenerate it:
 ```bash
 python manage.py spectacular --file schema.yml --validate
 ```
+
+## Workspace roles and teams
+
+Newly registered users are always `member` accounts; request fields such as
+`role`, `is_staff`, and `is_superuser` are ignored during registration.
+Workspace admins are identified by `User.role == "admin"`. Category write
+permissions intentionally remain separate and still require Django `is_staff`
+plus the relevant model permission.
+
+Phase 1 endpoints:
+
+- `GET /api/auth/me` — current user, role, and team
+- `GET /api/teams` — all teams (not paginated)
+- `GET /api/teams/{id}/members` — members of the authenticated user's team
+- `GET /api/admin/users` — paginated admin-only user list with search/filter and todo counts
+- `PATCH /api/admin/users/{id}` — admin-only role/team update
+
+To create a repeatable local demo workspace, set `SEED_PASSWORD` and run
+`python manage.py seed_workspace`. The command is never run automatically by
+Docker. In non-debug environments it refuses to use a default password.
 
 In Swagger UI, click **Authorize** and enter:
 

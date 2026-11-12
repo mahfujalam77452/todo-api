@@ -149,3 +149,9 @@ class _PayloadTooLarge(exceptions.APIException):
     status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
     default_detail = "Request body is too large."
     default_code = "payload_too_large"
+
+
+class Conflict(exceptions.APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "The request conflicts with the current resource state."
+    default_code = "conflict"

@@ -33,6 +33,7 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, name="", **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("role", User.Role.ADMIN)
         if extra_fields["is_staff"] is not True:
             raise ValueError("Superuser must have is_staff=True.")
         if extra_fields["is_superuser"] is not True:
@@ -41,6 +42,10 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser):
+    class Role(models.TextChoices):
+        MEMBER = "member", "Member"
+        ADMIN = "admin", "Admin"
+
     # Drop the fields we don't use from AbstractUser.
     username = None
     first_name = None
@@ -50,6 +55,7 @@ class User(AbstractUser):
     # unique=True is required by Django's auth checks for USERNAME_FIELD;
     # the Lower() constraint below makes it case-insensitive.
     email = models.EmailField(unique=True)
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["name"]  # asked by `createsuperuser` in addition to email
@@ -59,6 +65,10 @@ class User(AbstractUser):
     class Meta:
         constraints = [
             models.UniqueConstraint(Lower("email"), name="user_email_ci_unique"),
+            models.CheckConstraint(
+                condition=models.Q(role__in=["member", "admin"]),
+                name="user_role_valid",
+            ),
         ]
 
     def clean(self):

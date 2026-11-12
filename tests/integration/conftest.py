@@ -49,6 +49,7 @@ def authenticated_client(api_client, user):
 def admin_user():
     user = UserFactory(
         email="admin@example.com",
+        role="admin",
         is_staff=True,
         is_superuser=True,
     )

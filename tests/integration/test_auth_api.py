@@ -25,6 +25,8 @@ def test_register_login_refresh_and_logout_flow(api_client):
         "id": register.data["id"],
         "name": "New User",
         "email": "new@example.com",
+        "role": "member",
+        "team": None,
     }
 
     login = api_client.post(

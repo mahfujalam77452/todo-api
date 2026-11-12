@@ -8,7 +8,7 @@ class UserCreationForm(AdminUserCreationForm):
 
     class Meta:
         model = User
-        fields = ("email", "name")
+        fields = ("email", "name", "role")
         field_classes = {}
 
 

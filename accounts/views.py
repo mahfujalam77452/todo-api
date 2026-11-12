@@ -1,18 +1,28 @@
 from rest_framework import status
+from django.db.models import Count
+from rest_framework import permissions
 from rest_framework.generics import CreateAPIView, GenericAPIView
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.throttling import ScopedRateThrottle
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 
+from core.permissions import IsAdminRole
 from core.schema import ErrorResponseSerializer, ValidationErrorResponseSerializer
+from .models import User
 from .serializers import (
+    AdminUserSerializer,
     LoginSerializer,
     LogoutSerializer,
     RefreshSerializer,
     RegisterSerializer,
+    user_payload,
 )
 
 # The four endpoints below are public. Each one also sets authentication_classes
@@ -39,6 +49,18 @@ class RegisterView(CreateAPIView):
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
+
+
+class MeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=["Authentication"],
+        responses={200: OpenApiResponse(description="Current authenticated user.")},
+    )
+    def get(self, request):
+        user = User.objects.select_related("membership__team").get(pk=request.user.pk)
+        return Response(user_payload(user))
 
 
 class LoginView(TokenObtainPairView):
@@ -124,3 +146,25 @@ class LogoutView(GenericAPIView):
         except TokenError as exc:
             raise InvalidToken(exc.args[0])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminUserViewSet(ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAdminRole]
+    http_method_names = ["get", "patch", "head", "options"]
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_fields = ["role", "membership__team"]
+    search_fields = ["email", "name"]
+
+    def get_queryset(self):
+        return (
+            User.objects.select_related("membership__team")
+            .annotate(
+                created_count=Count("todos", distinct=True),
+                # Until Phase 2 introduces a separate assignee relation, all
+                # existing todos are both created and assigned by their owner.
+                assigned_count=Count("todos", distinct=True),
+            )
+            .order_by("email")
+        )

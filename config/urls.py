@@ -6,12 +6,16 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 from categories.views import CategoryViewSet
 from core.views import ApiNotFoundView, HealthView
 from todos.views import TodoViewSet
+from teams.views import TeamViewSet
+from accounts.views import AdminUserViewSet
 
 # Default routes, but without the trailing slash: /api/categories, /api/categories/1
 router = DefaultRouter(trailing_slash=False)
 router.include_format_suffixes = False  # no /api/categories.json variants
 router.register("categories", CategoryViewSet, basename="category")
 router.register("todos", TodoViewSet, basename="todo")
+router.register("teams", TeamViewSet, basename="team")
+router.register("admin/users", AdminUserViewSet, basename="admin-user")
 
 urlpatterns = [
     path("admin/", admin.site.urls),

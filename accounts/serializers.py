@@ -9,7 +9,14 @@ from rest_framework_simplejwt.serializers import (
     TokenRefreshSerializer,
 )
 
-from core.fields import StrictCharField, StrictEmailField, StrictSecretField
+from core.exceptions import Conflict
+from core.fields import (
+    StrictCharField,
+    StrictEmailField,
+    StrictPrimaryKeyRelatedField,
+    StrictSecretField,
+)
+from teams.models import Membership, Team
 
 User = get_user_model()
 
@@ -17,7 +24,102 @@ EMAIL_TAKEN = "A user with this email already exists."
 
 
 def user_payload(user):
-    return {"id": user.pk, "name": user.name, "email": user.email}
+    try:
+        membership = user.membership
+    except Membership.DoesNotExist:
+        membership = None
+    return {
+        "id": user.pk,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "team": (
+            {"id": membership.team_id, "name": membership.team.name}
+            if membership is not None
+            else None
+        ),
+    }
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    role = StrictCharField(max_length=20, single_line=True, required=False)
+    created_count = serializers.IntegerField(read_only=True, default=0)
+    assigned_count = serializers.IntegerField(read_only=True, default=0)
+    team_id = StrictPrimaryKeyRelatedField(
+        source="team",
+        queryset=Team.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+    team = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "name",
+            "email",
+            "role",
+            "team",
+            "team_id",
+            "created_count",
+            "assigned_count",
+        ]
+        read_only_fields = [
+            "id",
+            "name",
+            "email",
+            "team",
+            "created_count",
+            "assigned_count",
+        ]
+
+    def validate_role(self, value):
+        if value not in User.Role.values:
+            raise serializers.ValidationError("Role must be either 'member' or 'admin'.")
+        return value
+
+    def get_team(self, obj):
+        try:
+            membership = obj.membership
+        except Membership.DoesNotExist:
+            return None
+        return {"id": membership.team_id, "name": membership.team.name}
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        requested_role = validated_data.get("role")
+        if requested_role is not None and request.user.pk == instance.pk:
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("You cannot change your own role.")
+
+        team_supplied = "team" in validated_data
+        team = validated_data.pop("team", None)
+
+        with transaction.atomic():
+            target = User.objects.select_for_update().get(pk=instance.pk)
+            if requested_role is not None and requested_role != target.role:
+                if target.role == User.Role.ADMIN and requested_role != User.Role.ADMIN:
+                    admin_count = User.objects.select_for_update().filter(
+                        role=User.Role.ADMIN
+                    ).count()
+                    if admin_count <= 1:
+                        raise Conflict("The last workspace admin cannot be demoted.")
+                target.role = requested_role
+                target.save(update_fields=["role"])
+
+            if team_supplied:
+                if team is None:
+                    Membership.objects.filter(user=target).delete()
+                else:
+                    Membership.objects.update_or_create(
+                        user=target,
+                        defaults={"team": team},
+                    )
+
+        return target
 
 
 class RegisterSerializer(serializers.Serializer):

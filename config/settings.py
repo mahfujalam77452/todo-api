@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     # Local apps
     "core",
     "accounts",
+    "teams",
     "categories",
     "todos",
 
