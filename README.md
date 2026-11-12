@@ -2,8 +2,8 @@
 
 A secure TODO management API built with Django and Django REST Framework.
 Users authenticate with email-based JWT tokens and can access only their own
-todos. Categories are global, readable by authenticated users, and writable
-only by administrators.
+related todos. Categories are global, readable by authenticated users, and
+writable only by Django staff users with the relevant model permission.
 
 ## Features
 
@@ -146,6 +146,7 @@ curl https://todo-api-awz4.onrender.com/api/health
 | `REDIS_URL` | No | Redis URL, for example `redis://localhost:6379/1` |
 | `JWT_SIGNING_KEY` | No | Separate JWT signing key; must be at least 32 characters |
 | `NUM_PROXIES` | No | Number of trusted reverse proxies used for client IP throttling |
+| `SEED_PASSWORD` | No | Password for the manual `seed_workspace` command; required when `DEBUG=false` |
 
 If `REDIS_URL` is empty, the project uses per-process in-memory cache. The API
 continues to work, but cache and throttle state is not shared between workers.
@@ -313,6 +314,12 @@ bottlenecks are assignments older than seven days, overdue means a non-completed
 todo whose due date has passed, and high-rejection users have a rejection rate
 of at least 50% with at least one rejected assignment. All dashboard endpoints
 are role-admin-only and reject write methods.
+
+Category management deliberately remains based on Django `is_staff` and model
+permissions; workspace `role=admin` controls the workspace/admin APIs and does
+not automatically grant category write access. SQLite ignores
+`select_for_update()`, so production deployments should use PostgreSQL for
+strong concurrent accept/reject locking.
 
 In Swagger UI, click **Authorize** and enter:
 
