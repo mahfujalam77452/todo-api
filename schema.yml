@@ -48,6 +48,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/auth/me:
+    get:
+      operationId: auth_me_retrieve
+      tags:
+      - Authentication
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Current authenticated user.
   /api/auth/login:
     post:
       operationId: auth_login_create
@@ -186,6 +197,37 @@ paths:
                   $ref: '#/components/schemas/Category'
           description: ''
   /api/categories/{id}:
+    delete:
+      operationId: categories_destroy
+      description: 'Categories are global: every user can read them, only admins can
+        change them.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Categories
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
     patch:
       operationId: categories_partial_update
       description: 'Categories are global: every user can read them, only admins can
@@ -261,37 +303,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
-    delete:
-      operationId: categories_destroy
-      description: 'Categories are global: every user can read them, only admins can
-        change them.'
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          pattern: ^[1-9][0-9]{0,17}$
-        required: true
-      tags:
-      - Categories
-      security:
-      - BearerAuth: []
-      - BearerAuth: []
-      responses:
-        '204':
-          description: No response body
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
   /api/todos:
     post:
       operationId: todos_create
@@ -323,6 +334,21 @@ paths:
       operationId: todos_list
       description: List only the authenticated user's todos.
       parameters:
+      - in: query
+        name: assignment_status
+        schema:
+          type: string
+          nullable: true
+          enum:
+          - accepted
+          - pending
+          - rejected
+        description: |-
+          pending, accepted, or rejected
+
+          * `pending` - pending
+          * `accepted` - accepted
+          * `rejected` - rejected
       - in: query
         name: category
         schema:
@@ -373,6 +399,18 @@ paths:
         schema:
           type: string
         description: '1 (low), 2 (medium) or 3 (high). Repeat for several: ?priority=2&priority=3'
+      - in: query
+        name: relation
+        schema:
+          type: string
+          enum:
+          - assigned_by_me
+          - assigned_to_me
+        description: |-
+          assigned_to_me or assigned_by_me
+
+          * `assigned_to_me` - assigned_to_me
+          * `assigned_by_me` - assigned_by_me
       - name: search
         required: false
         in: query
@@ -385,12 +423,19 @@ paths:
           type: string
           enum:
           - completed
+          - in_progress
           - pending
         description: |-
-          completed or pending
+          pending, in_progress, or completed
 
-          * `completed` - completed
           * `pending` - pending
+          * `in_progress` - in_progress
+          * `completed` - completed
+      - in: query
+        name: team
+        schema:
+          type: string
+        description: Team id.
       tags:
       - Todos
       security:
@@ -410,6 +455,30 @@ paths:
                 $ref: '#/components/schemas/ValidationErrorResponse'
           description: ''
   /api/todos/{id}:
+    delete:
+      operationId: todos_destroy
+      description: Hard-delete one of the authenticated user's todos.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Todos
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
     patch:
       operationId: todos_partial_update
       parameters:
@@ -475,9 +544,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
-    delete:
-      operationId: todos_destroy
-      description: Hard-delete one of the authenticated user's todos.
+  /api/todos/{id}/accept:
+    post:
+      operationId: todos_accept_create
       parameters:
       - in: path
         name: id
@@ -486,13 +555,522 @@ paths:
           pattern: ^[1-9][0-9]{0,17}$
         required: true
       tags:
-      - Todos
+      - todos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentResponseRequest'
       security:
       - BearerAuth: []
       - BearerAuth: []
       responses:
-        '204':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/todos/{id}/assign:
+    post:
+      operationId: todos_assign_create
+      description: Assign a todo to a member of the assigner's team.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - todos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignTodoRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/todos/{id}/reject:
+    post:
+      operationId: todos_reject_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - todos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentResponseRequest'
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/teams:
+    get:
+      operationId: teams_list
+      description: List all workspace teams.
+      tags:
+      - Teams
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Team'
+          description: ''
+  /api/teams/{id}:
+    get:
+      operationId: teams_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Teams
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/teams/{id}/members:
+    get:
+      operationId: teams_members_retrieve
+      description: List members of the authenticated user's team.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - teams
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/admin/users:
+    get:
+      operationId: admin_users_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: membership__team
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: query
+        name: role
+        schema:
+          type: string
+          enum:
+          - admin
+          - member
+        description: |-
+          * `member` - Member
+          * `admin` - Admin
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - admin
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminUserList'
+          description: ''
+  /api/admin/users/{id}:
+    patch:
+      operationId: admin_users_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserRequest'
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+    get:
+      operationId: admin_users_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - admin
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+  /api/notifications:
+    get:
+      operationId: notifications_list
+      description: List notifications belonging to the authenticated user.
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - Notifications
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+  /api/notifications/read-all:
+    post:
+      operationId: notifications_read_all_create
+      description: Mark all of the authenticated user's notifications as read.
+      tags:
+      - notifications
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadAllResponse'
+          description: ''
+  /api/notifications/unread-count:
+    get:
+      operationId: notifications_unread_count_retrieve
+      description: Return the authenticated user's unread notification count.
+      tags:
+      - notifications
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCount'
+          description: ''
+  /api/notifications/{id}/read:
+    post:
+      operationId: notifications_read_create
+      description: Mark one of the authenticated user's notifications as read.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this notification.
+        required: true
+      tags:
+      - notifications
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/admin/dashboard/overview:
+    get:
+      operationId: admin_dashboard_overview_retrieve
+      description: Database-backed workspace overview metrics for administrators.
+      tags:
+      - Admin Dashboard
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Overview'
+          description: ''
+  /api/admin/dashboard/users:
+    get:
+      operationId: admin_dashboard_users_list
+      tags:
+      - Admin Dashboard
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DashboardUser'
+          description: ''
+  /api/admin/dashboard/teams:
+    get:
+      operationId: admin_dashboard_teams_list
+      tags:
+      - Admin Dashboard
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DashboardTeam'
+          description: ''
+  /api/admin/dashboard/activity:
+    get:
+      operationId: admin_dashboard_activity_list
+      tags:
+      - Admin Dashboard
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Activity'
+          description: ''
+  /api/admin/users/{user_id}/todos:
+    get:
+      operationId: admin_users_todos_list
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin Dashboard
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Todo'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/admin/todos/{todo_id}:
+    get:
+      operationId: admin_todos_retrieve
+      parameters:
+      - in: path
+        name: todo_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin Dashboard
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+          description: ''
         '404':
           content:
             application/json:
@@ -501,6 +1079,81 @@ paths:
           description: ''
 components:
   schemas:
+    Activity:
+      type: object
+      properties:
+        type:
+          type: string
+        todo_id:
+          type: integer
+        title:
+          type: string
+        user_id:
+          type: integer
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+        assignment_status:
+          type: string
+          nullable: true
+      required:
+      - assignment_status
+      - occurred_at
+      - title
+      - todo_id
+      - type
+      - user_id
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        role:
+          type: string
+          maxLength: 20
+        team:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          readOnly: true
+        created_count:
+          type: integer
+          readOnly: true
+          default: 0
+        assigned_count:
+          type: integer
+          readOnly: true
+          default: 0
+      required:
+      - assigned_count
+      - created_count
+      - email
+      - id
+      - name
+      - team
+    AssignTodoRequest:
+      type: object
+      properties:
+        assignee_id:
+          type: integer
+      required:
+      - assignee_id
+    AssignmentResponseRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          default: ''
+          maxLength: 250
     Category:
       type: object
       properties:
@@ -527,6 +1180,74 @@ components:
           maxLength: 50
       required:
       - name
+    DashboardTeam:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        member_count:
+          type: integer
+        todo_count:
+          type: integer
+        completed_count:
+          type: integer
+        pending_assignment_count:
+          type: integer
+        completion_rate:
+          type: number
+          format: double
+      required:
+      - completed_count
+      - completion_rate
+      - id
+      - member_count
+      - name
+      - pending_assignment_count
+      - todo_count
+    DashboardUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+        team:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        created_count:
+          type: integer
+        assigned_count:
+          type: integer
+        completed_count:
+          type: integer
+        rejected_count:
+          type: integer
+        completion_rate:
+          type: number
+          format: double
+        rejection_rate:
+          type: number
+          format: double
+      required:
+      - assigned_count
+      - completed_count
+      - completion_rate
+      - created_count
+      - email
+      - id
+      - name
+      - rejected_count
+      - rejection_rate
+      - role
+      - team
     ErrorResponse:
       type: object
       properties:
@@ -575,6 +1296,122 @@ components:
           maxLength: 4096
       required:
       - refresh
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        type:
+          allOf:
+          - $ref: '#/components/schemas/TypeEnum'
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+        todo_id:
+          type: integer
+          readOnly: true
+        link:
+          type: string
+          readOnly: true
+        is_read:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        read_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - created_at
+      - id
+      - is_read
+      - link
+      - message
+      - read_at
+      - todo_id
+      - type
+    Overview:
+      type: object
+      properties:
+        users:
+          type: integer
+        teams:
+          type: integer
+        todos:
+          type: integer
+        incomplete_todos:
+          type: integer
+        completed_todos:
+          type: integer
+        pending_assignments:
+          type: integer
+        completion_rate:
+          type: number
+          format: double
+        bottlenecks:
+          type: object
+          additionalProperties: {}
+      required:
+      - bottlenecks
+      - completed_todos
+      - completion_rate
+      - incomplete_todos
+      - pending_assignments
+      - teams
+      - todos
+      - users
+    PaginatedAdminUserList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+    PaginatedNotificationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
     PaginatedTodoList:
       type: object
       required:
@@ -598,6 +1435,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Todo'
+    PatchedAdminUserRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          minLength: 1
+          maxLength: 20
+        team_id:
+          type: integer
+          writeOnly: true
+          nullable: true
     PatchedCategoryRequest:
       type: object
       properties:
@@ -616,9 +1464,10 @@ components:
           type: string
           default: ''
           maxLength: 10000
-        is_completed:
-          type: boolean
-          default: false
+        status:
+          type: string
+          minLength: 1
+          default: pending
         priority:
           allOf:
           - $ref: '#/components/schemas/PriorityEnum'
@@ -630,6 +1479,10 @@ components:
         category:
           type: integer
           nullable: true
+        assignee_id:
+          type: integer
+          writeOnly: true
+          nullable: true
     PriorityEnum:
       enum:
       - 1
@@ -640,6 +1493,13 @@ components:
         * `1` - Low
         * `2` - Medium
         * `3` - High
+    ReadAllResponse:
+      type: object
+      properties:
+        updated:
+          type: integer
+      required:
+      - updated
     Refresh:
       type: object
       description: |-
@@ -711,6 +1571,23 @@ components:
       - email
       - name
       - password
+    Team:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
     Todo:
       type: object
       properties:
@@ -724,9 +1601,12 @@ components:
           type: string
           default: ''
           maxLength: 10000
+        status:
+          type: string
+          default: pending
         is_completed:
           type: boolean
-          default: false
+          readOnly: true
         priority:
           allOf:
           - $ref: '#/components/schemas/PriorityEnum'
@@ -745,6 +1625,35 @@ components:
           type: string
           readOnly: true
           nullable: true
+        assigner:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          readOnly: true
+        assignee:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          readOnly: true
+        team:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          readOnly: true
+        assignment_status:
+          type: string
+          readOnly: true
+          nullable: true
+        assigned_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        responded_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -754,10 +1663,17 @@ components:
           format: date-time
           readOnly: true
       required:
+      - assigned_at
+      - assignee
+      - assigner
+      - assignment_status
       - category_name
       - created_at
       - id
+      - is_completed
       - priority_display
+      - responded_at
+      - team
       - title
       - updated_at
     TodoRequest:
@@ -771,9 +1687,10 @@ components:
           type: string
           default: ''
           maxLength: 10000
-        is_completed:
-          type: boolean
-          default: false
+        status:
+          type: string
+          minLength: 1
+          default: pending
         priority:
           allOf:
           - $ref: '#/components/schemas/PriorityEnum'
@@ -785,8 +1702,31 @@ components:
         category:
           type: integer
           nullable: true
+        assignee_id:
+          type: integer
+          writeOnly: true
+          nullable: true
       required:
       - title
+    TypeEnum:
+      enum:
+      - assigned
+      - accepted
+      - rejected
+      - role_changed
+      type: string
+      description: |-
+        * `assigned` - Assigned
+        * `accepted` - Accepted
+        * `rejected` - Rejected
+        * `role_changed` - Role changed
+    UnreadCount:
+      type: object
+      properties:
+        count:
+          type: integer
+      required:
+      - count
     ValidationErrorResponse:
       type: object
       properties:
