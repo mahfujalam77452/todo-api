@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     "categories",
     "todos",
     "notifications",
+    "dashboard",
 
 ]
 

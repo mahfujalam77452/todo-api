@@ -296,6 +296,24 @@ To create a repeatable local demo workspace, set `SEED_PASSWORD` and run
 `python manage.py seed_workspace`. The command is never run automatically by
 Docker. In non-debug environments it refuses to use a default password.
 
+## Admin dashboard
+
+Workspace admins can access the read-only dashboard endpoints:
+
+- `GET /api/admin/dashboard/overview`
+- `GET /api/admin/dashboard/users`
+- `GET /api/admin/dashboard/teams`
+- `GET /api/admin/dashboard/activity`
+- `GET /api/admin/users/{id}/todos`
+- `GET /api/admin/todos/{id}`
+
+Dashboard completion rate means `completed / total * 100`; user and team
+completion rates use assigned/team todos respectively. Pending-assignment
+bottlenecks are assignments older than seven days, overdue means a non-completed
+todo whose due date has passed, and high-rejection users have a rejection rate
+of at least 50% with at least one rejected assignment. All dashboard endpoints
+are role-admin-only and reject write methods.
+
 In Swagger UI, click **Authorize** and enter:
 
 ```text

@@ -9,6 +9,14 @@ from todos.views import TodoViewSet
 from teams.views import TeamViewSet
 from accounts.views import AdminUserViewSet
 from notifications.views import NotificationViewSet
+from dashboard.views import (
+    AdminTodoDetailView,
+    AdminUserTodosView,
+    DashboardActivityView,
+    DashboardTeamsView,
+    DashboardUsersView,
+    OverviewView,
+)
 
 # Default routes, but without the trailing slash: /api/categories, /api/categories/1
 router = DefaultRouter(trailing_slash=False)
@@ -28,6 +36,12 @@ urlpatterns = [
     
     path("api/auth/", include("accounts.urls")),
     path("api/", include(router.urls)),
+    path("api/admin/dashboard/overview", OverviewView.as_view(), name="admin-dashboard-overview"),
+    path("api/admin/dashboard/users", DashboardUsersView.as_view(), name="admin-dashboard-users"),
+    path("api/admin/dashboard/teams", DashboardTeamsView.as_view(), name="admin-dashboard-teams"),
+    path("api/admin/dashboard/activity", DashboardActivityView.as_view(), name="admin-dashboard-activity"),
+    path("api/admin/users/<int:user_id>/todos", AdminUserTodosView.as_view(), name="admin-user-todos"),
+    path("api/admin/todos/<int:todo_id>", AdminTodoDetailView.as_view(), name="admin-todo-detail"),
     # Must stay last: any other /api/... URL is a JSON 404.
     path("api/<path:unknown>", ApiNotFoundView.as_view(), name="api-not-found"),
 ]
