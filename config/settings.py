@@ -139,9 +139,10 @@ WSGI_APPLICATION = "config.wsgi.application"
 # SQLite, tuned for a web app that may run several workers.
 # ------------------------------------------------------------------- database
 # PostgreSQL in production, SQLite in local development.
+SQLITE_PATH = os.environ.get("DB_PATH", str(BASE_DIR / "db.sqlite3")).strip()
 DATABASES = {
     "default": dj_database_url.config(
-        default="sqlite:///" + str(BASE_DIR / "db.sqlite3"),
+        default="sqlite:///" + SQLITE_PATH,
         conn_max_age=600,
         conn_health_checks=True,
     )
