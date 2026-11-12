@@ -8,6 +8,7 @@ from core.views import ApiNotFoundView, HealthView
 from todos.views import TodoViewSet
 from teams.views import TeamViewSet
 from accounts.views import AdminUserViewSet
+from notifications.views import NotificationViewSet
 
 # Default routes, but without the trailing slash: /api/categories, /api/categories/1
 router = DefaultRouter(trailing_slash=False)
@@ -16,6 +17,7 @@ router.register("categories", CategoryViewSet, basename="category")
 router.register("todos", TodoViewSet, basename="todo")
 router.register("teams", TeamViewSet, basename="team")
 router.register("admin/users", AdminUserViewSet, basename="admin-user")
+router.register("notifications", NotificationViewSet, basename="notification")
 
 urlpatterns = [
     path("admin/", admin.site.urls),

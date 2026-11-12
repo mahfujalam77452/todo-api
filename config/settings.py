@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "teams",
     "categories",
     "todos",
+    "notifications",
 
 ]
 
@@ -266,6 +267,7 @@ THROTTLE_RATES = {
     "login": "5/min",       # per IP: slows down password guessing
     "register": "5/hour",   # per IP: slows down account creation and email probing
     "token": "30/min",      # per IP: refresh and logout
+    "notifications": "120/min",  # notification polling has its own budget
 }
 
 

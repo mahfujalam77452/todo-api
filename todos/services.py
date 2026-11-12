@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from teams.models import Membership
+from notifications.services import notify_accepted, notify_assigned, notify_rejected
 
 from .models import Todo
 
@@ -45,6 +46,8 @@ def assign_todo(todo, assigner, assignee):
             responded_at=now if assignment_status == Todo.AssignmentStatus.ACCEPTED else None,
             updated_at=now,
         )
+        if assignee.pk != assigner.pk:
+            notify_assigned(todo, assignee)
 
     todo.assignee = assignee
     todo.team = team
@@ -52,4 +55,44 @@ def assign_todo(todo, assigner, assignee):
     todo.assigned_at = now
     todo.responded_at = now if assignment_status == Todo.AssignmentStatus.ACCEPTED else None
     todo.updated_at = now
+    return todo
+
+
+def respond_to_assignment(todo, assignee, accepted, reason=None):
+    if todo.assignee_id != assignee.pk:
+        raise PermissionDenied("Only the assignee can respond to this assignment.")
+
+    new_status = (
+        Todo.AssignmentStatus.ACCEPTED
+        if accepted
+        else Todo.AssignmentStatus.REJECTED
+    )
+    now = timezone.now()
+    with transaction.atomic():
+        try:
+            locked = Todo.objects.select_for_update().select_related(
+                "assigner", "assignee"
+            ).get(pk=todo.pk)
+        except Todo.DoesNotExist:
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound()
+        rows = Todo.objects.filter(
+            pk=locked.pk,
+            assignee=assignee,
+            assignment_status=Todo.AssignmentStatus.PENDING,
+        ).update(assignment_status=new_status, responded_at=now, updated_at=now)
+        if rows == 0:
+            from core.exceptions import Conflict
+
+            raise Conflict("This assignment is no longer pending.")
+
+        locked.assignment_status = new_status
+        locked.responded_at = now
+        locked.updated_at = now
+        if accepted:
+            notify_accepted(locked, locked.assigner)
+        else:
+            notify_rejected(locked, locked.assigner, reason=reason)
+        todo = locked
     return todo

@@ -13,8 +13,13 @@ from core.schema import ErrorResponseSerializer, ValidationErrorResponseSerializ
 
 from .filters import TodoFilter
 from .models import Todo
-from .serializers import AssignTodoSerializer, TodoSerializer
-from .services import assign_todo, validate_assignment
+from .permissions import CanEditTodo
+from .serializers import (
+    AssignTodoSerializer,
+    AssignmentResponseSerializer,
+    TodoSerializer,
+)
+from .services import assign_todo, respond_to_assignment, validate_assignment
 
 
 def _title_ci(descending):
@@ -67,6 +72,7 @@ class TodoViewSet(ModelViewSet):
     # leak anyone's todos.
     queryset = Todo.objects.none()
     serializer_class = TodoSerializer
+    permission_classes = [CanEditTodo]
     # Plain ASCII digits, no leading zero, at most 18 digits (fits SQLite's
     # 64-bit integer). Everything else (abc, 0, 007, Bangla digits) is a 404.
     lookup_value_regex = r"[1-9][0-9]{0,17}"
@@ -124,6 +130,48 @@ class TodoViewSet(ModelViewSet):
         input_serializer = AssignTodoSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
         todo = assign_todo(todo, request.user, input_serializer.validated_data["assignee_id"])
+        return Response(self.get_serializer(todo).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        request=AssignmentResponseSerializer,
+        responses={
+            200: TodoSerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            403: OpenApiResponse(ErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+            409: OpenApiResponse(ErrorResponseSerializer),
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="accept")
+    def accept(self, request, *args, **kwargs):
+        todo = self.get_object()
+        input_serializer = AssignmentResponseSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        todo = respond_to_assignment(
+            todo, request.user, accepted=True,
+            reason=input_serializer.validated_data.get("reason", ""),
+        )
+        return Response(self.get_serializer(todo).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        request=AssignmentResponseSerializer,
+        responses={
+            200: TodoSerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            403: OpenApiResponse(ErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+            409: OpenApiResponse(ErrorResponseSerializer),
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, *args, **kwargs):
+        todo = self.get_object()
+        input_serializer = AssignmentResponseSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        todo = respond_to_assignment(
+            todo, request.user, accepted=False,
+            reason=input_serializer.validated_data.get("reason", ""),
+        )
         return Response(self.get_serializer(todo).data, status=status.HTTP_200_OK)
 
     def filter_queryset(self, queryset):

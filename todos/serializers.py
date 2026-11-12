@@ -177,3 +177,13 @@ class AssignTodoSerializer(serializers.Serializer):
         queryset=User.objects.filter(is_active=True),
         allow_null=False,
     )
+
+
+class AssignmentResponseSerializer(serializers.Serializer):
+    reason = StrictCharField(
+        required=False,
+        allow_blank=True,
+        max_length=250,
+        single_line=True,
+        default="",
+    )
