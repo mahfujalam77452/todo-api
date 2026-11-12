@@ -3,8 +3,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 
 from categories.models import Category
+from accounts.models import User
 from core.fields import (
-    StrictBooleanField,
     StrictCharField,
     StrictDateTimeField,
     StrictIntegerChoiceField,
@@ -26,7 +26,8 @@ class TodoSerializer(serializers.ModelSerializer):
     description = StrictCharField(
         required=False, allow_blank=True, default="", max_length=DESCRIPTION_MAX_LENGTH
     )
-    is_completed = StrictBooleanField(required=False, default=False)
+    status = StrictCharField(required=False, default="pending", single_line=True)
+    is_completed = serializers.SerializerMethodField(read_only=True)
     priority = StrictIntegerChoiceField(
         choices=Todo.Priority.choices,
         required=False,
@@ -44,6 +45,16 @@ class TodoSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(
         source="category.name", read_only=True, allow_null=True
     )
+    assigner = serializers.SerializerMethodField()
+    assignee = serializers.SerializerMethodField()
+    team = serializers.SerializerMethodField()
+    assignment_status = serializers.CharField(read_only=True, allow_null=True)
+    assignee_id = StrictPrimaryKeyRelatedField(
+        queryset=User.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
 
     class Meta:
         model = Todo
@@ -51,22 +62,80 @@ class TodoSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "status",
             "is_completed",
             "priority",
             "priority_display",
             "due_date",
             "category",
             "category_name",
+            "assigner",
+            "assignee",
+            "assignee_id",
+            "team",
+            "assignment_status",
+            "assigned_at",
+            "responded_at",
             "created_at",
             "updated_at",
         ]
          # `user` is deliberately not a field: clients can never set it.
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "is_completed",
+            "assigner",
+            "assignee",
+            "team",
+            "assignment_status",
+            "assigned_at",
+            "responded_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_is_completed(self, obj):
+        return obj.status == Todo.Status.COMPLETED
+
+    def get_assigner(self, obj):
+        return self._user_payload(obj.assigner)
+
+    def get_assignee(self, obj):
+        return self._user_payload(obj.assignee)
+
+    def get_team(self, obj):
+        if obj.team is None:
+            return None
+        return {"id": obj.team.pk, "name": obj.team.name}
+
+    @staticmethod
+    def _user_payload(user):
+        if user is None:
+            return None
+        return {"id": user.pk, "name": user.name, "email": user.email}
+
+    def validate_status(self, value):
+        if value not in Todo.Status.values:
+            raise serializers.ValidationError(
+                "Status must be pending, in_progress, or completed."
+            )
+        return value
+
+    def validate(self, attrs):
+        if self.instance is not None and "assignee_id" in attrs:
+            raise serializers.ValidationError(
+                {"assignee_id": "Assignment changes must use the assign action."}
+            )
+        return attrs
     
     def validate_due_date(self, value):
         if value is not None:
             ensure_in_year_window(value, DUE_DATE_MIN_YEAR, DUE_DATE_MAX_YEAR)
         return value
+
+    def create(self, validated_data):
+        # The view owns assigner and applies optional assignment atomically.
+        validated_data.pop("assignee_id", None)
+        return Todo.objects.create(**validated_data)
     
 
 
@@ -91,11 +160,7 @@ class TodoSerializer(serializers.ModelSerializer):
 
         now = timezone.now()
         
-        # user_id in the filter: even if this were ever called with somebody
-        # else's instance, it could not write to a todo the caller does not own.
-        rows = Todo.objects.filter(pk=instance.pk, user_id=instance.user_id).update(
-            **changed, updated_at=now
-        )
+        rows = Todo.objects.filter(pk=instance.pk).update(**changed, updated_at=now)
         
         if rows == 0:
             # Deleted by someone else between our read and this write.
@@ -105,3 +170,10 @@ class TodoSerializer(serializers.ModelSerializer):
             setattr(instance, field, value)
         instance.updated_at = now
         return instance
+
+
+class AssignTodoSerializer(serializers.Serializer):
+    assignee_id = StrictPrimaryKeyRelatedField(
+        queryset=User.objects.filter(is_active=True),
+        allow_null=False,
+    )

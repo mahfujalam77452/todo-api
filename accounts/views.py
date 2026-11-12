@@ -161,10 +161,8 @@ class AdminUserViewSet(ModelViewSet):
         return (
             User.objects.select_related("membership__team")
             .annotate(
-                created_count=Count("todos", distinct=True),
-                # Until Phase 2 introduces a separate assignee relation, all
-                # existing todos are both created and assigned by their owner.
-                assigned_count=Count("todos", distinct=True),
+                created_count=Count("created_todos", distinct=True),
+                assigned_count=Count("assigned_todos", distinct=True),
             )
             .order_by("email")
         )

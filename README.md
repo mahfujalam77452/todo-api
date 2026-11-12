@@ -10,7 +10,7 @@ only by administrators.
 - Email-based custom user model
 - Workspace roles (`member` and `admin`) with team memberships
 - JWT access/refresh tokens with refresh-token blacklist logout
-- Private per-user TODOs
+- Private TODOs visible to their assigner and assignee
 - Authenticated profile, team list/member list, and admin user-management APIs
 - Categories with case-insensitive unique names
 - Partial updates with `PATCH`; `PUT` is intentionally disabled
@@ -361,11 +361,12 @@ Logout blacklists the refresh token and returns `204 No Content`.
 | `POST` | `/api/auth/login` | Public | Obtain access/refresh tokens |
 | `POST` | `/api/auth/token/refresh` | Public | Rotate refresh token |
 | `POST` | `/api/auth/logout` | Public with refresh token | Blacklist refresh token |
-| `GET` | `/api/todos` | Authenticated | List own todos |
+| `GET` | `/api/todos` | Authenticated | List todos assigned by or to the user |
 | `POST` | `/api/todos` | Authenticated | Create a todo |
-| `GET` | `/api/todos/{id}` | Authenticated | Retrieve own todo |
-| `PATCH` | `/api/todos/{id}` | Authenticated | Partially update own todo |
-| `DELETE` | `/api/todos/{id}` | Authenticated | Hard-delete own todo |
+| `GET` | `/api/todos/{id}` | Authenticated | Retrieve a related todo |
+| `PATCH` | `/api/todos/{id}` | Authenticated | Partially update a related todo |
+| `DELETE` | `/api/todos/{id}` | Authenticated | Hard-delete a related todo |
+| `POST` | `/api/todos/{id}/assign` | Assigner | Assign to a same-team member |
 | `GET` | `/api/categories` | Authenticated | List categories |
 | `GET` | `/api/categories/{id}` | Authenticated | Retrieve a category |
 | `POST` | `/api/categories` | Admin | Create a category |
@@ -396,7 +397,7 @@ curl -X POST http://127.0.0.1:8000/api/todos \
 curl -X PATCH http://127.0.0.1:8000/api/todos/1 \
   -H "Authorization: Bearer <access-token>" \
   -H "Content-Type: application/json" \
-  -d '{"is_completed": true}'
+  -d '{"status": "completed"}'
 ```
 
 ### List, filter, search, order, and paginate
@@ -404,6 +405,9 @@ curl -X PATCH http://127.0.0.1:8000/api/todos/1 \
 ```text
 GET /api/todos?limit=10&offset=0
 GET /api/todos?status=pending
+GET /api/todos?status=in_progress
+GET /api/todos?assignment_status=pending&relation=assigned_to_me
+GET /api/todos?team=1
 GET /api/todos?priority=3&overdue=true
 GET /api/todos?has_category=true
 GET /api/todos?search=groceries

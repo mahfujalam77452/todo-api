@@ -1,6 +1,10 @@
-from django.db.models import F
+from django.db import transaction
+from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 
@@ -9,7 +13,8 @@ from core.schema import ErrorResponseSerializer, ValidationErrorResponseSerializ
 
 from .filters import TodoFilter
 from .models import Todo
-from .serializers import TodoSerializer
+from .serializers import AssignTodoSerializer, TodoSerializer
+from .services import assign_todo, validate_assignment
 
 
 def _title_ci(descending):
@@ -79,18 +84,47 @@ class TodoViewSet(ModelViewSet):
     }
 
     def get_queryset(self):
-        """Only the caller's own todos, for every action. Somebody else's todo
+        """Only todos assigned by or to the caller, for every action. Somebody else's todo
         is a 404, exactly like one that does not exist, so ids cannot be probed.
         Admins get no exception: they have no access to anyone's todos.
 
         select_related: category_name is read for every row, so fetch it with
         the todos in one query instead of one extra query per todo (N+1).
         Ordering comes from Todo.Meta: newest first, id as the tie-breaker."""
-        return Todo.objects.filter(user=self.request.user).select_related("category")
+        return (
+            Todo.objects.filter(
+                Q(assigner=self.request.user) | Q(assignee=self.request.user)
+            )
+            .select_related("category", "assigner", "assignee", "team")
+            .distinct()
+        )
 
     def perform_create(self, serializer):
-        # The owner is never taken from the request body.
-        serializer.save(user=self.request.user)
+        assignee = serializer.validated_data.get("assignee_id")
+        with transaction.atomic():
+            if assignee is not None:
+                validate_assignment(self.request.user, assignee)
+            todo = serializer.save(assigner=self.request.user)
+            if assignee is not None:
+                assign_todo(todo, self.request.user, assignee)
+
+    @extend_schema(
+        request=AssignTodoSerializer,
+        responses={
+            200: TodoSerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            403: OpenApiResponse(ErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description="Assign a todo to a member of the assigner's team.",
+    )
+    @action(detail=True, methods=["post"], url_path="assign")
+    def assign(self, request, *args, **kwargs):
+        todo = self.get_object()
+        input_serializer = AssignTodoSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        todo = assign_todo(todo, request.user, input_serializer.validated_data["assignee_id"])
+        return Response(self.get_serializer(todo).data, status=status.HTTP_200_OK)
 
     def filter_queryset(self, queryset):
         # Filters belong to the list only. Without this, GET /todos/5?status=pending

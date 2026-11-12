@@ -9,7 +9,20 @@ from core.filters import parse_bool, parse_datetime_param, parse_id
 from .models import Todo
 from .serializers import DUE_DATE_MAX_YEAR, DUE_DATE_MIN_YEAR
 
-STATUS_CHOICES = [("completed", "completed"), ("pending", "pending")]
+STATUS_CHOICES = [
+    ("pending", "pending"),
+    ("in_progress", "in_progress"),
+    ("completed", "completed"),
+]
+ASSIGNMENT_STATUS_CHOICES = [
+    ("pending", "pending"),
+    ("accepted", "accepted"),
+    ("rejected", "rejected"),
+]
+RELATION_CHOICES = [
+    ("assigned_to_me", "assigned_to_me"),
+    ("assigned_by_me", "assigned_by_me"),
+]
 MAX_CATEGORY_FILTERS = 20
 
 
@@ -19,7 +32,17 @@ class TodoFilter(filters.FilterSet):
     status = filters.ChoiceFilter(
         choices=STATUS_CHOICES,
         method="filter_status",
-        help_text="completed or pending",
+        help_text="pending, in_progress, or completed",
+    )
+    assignment_status = filters.ChoiceFilter(
+        choices=ASSIGNMENT_STATUS_CHOICES,
+        method="filter_assignment_status",
+        help_text="pending, accepted, or rejected",
+    )
+    relation = filters.ChoiceFilter(
+        choices=RELATION_CHOICES,
+        method="filter_relation",
+        help_text="assigned_to_me or assigned_by_me",
     )
     category = filters.CharFilter(
         method="filter_category",
@@ -45,6 +68,10 @@ class TodoFilter(filters.FilterSet):
         method="filter_due_after",
         help_text="due on or after this date and time, e.g. 2026-12-01T18:00:00+06:00",
     )
+    team = filters.CharFilter(
+        method="filter_team",
+        help_text="Team id.",
+    )
 
     class Meta:
         model = Todo
@@ -67,7 +94,19 @@ class TodoFilter(filters.FilterSet):
         super().__init__(data, *args, **kwargs)
 
     def filter_status(self, queryset, name, value):
-        return queryset.filter(is_completed=(value == "completed"))
+        return queryset.filter(status=value)
+
+    def filter_assignment_status(self, queryset, name, value):
+        return queryset.filter(assignment_status=value)
+
+    def filter_relation(self, queryset, name, value):
+        user = getattr(self.request, "user", None)
+        if value == "assigned_to_me":
+            return queryset.filter(assignee=user)
+        return queryset.filter(assigner=user)
+
+    def filter_team(self, queryset, name, value):
+        return queryset.filter(team_id=parse_id(value, name))
 
     def filter_category(self, queryset, name, value):
         # django-filter hands over only the last value; read all of them.
@@ -108,7 +147,7 @@ class TodoFilter(filters.FilterSet):
         overdue = parse_bool(value, name)
         # Past due and still open. A todo without a due date is never overdue, and
         # exactly "now" is not yet overdue. `now` is read per request.
-        condition = Q(is_completed=False, due_date__lt=timezone.now())
+        condition = ~Q(status="completed") & Q(due_date__lt=timezone.now())
         return queryset.filter(condition) if overdue else queryset.exclude(condition)
 
     def _due(self, name, value):
