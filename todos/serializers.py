@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
+from drf_spectacular.utils import extend_schema_field
 
 from categories.models import Category
 from accounts.models import User
@@ -93,15 +94,19 @@ class TodoSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    def get_is_completed(self, obj):
+    @extend_schema_field(serializers.BooleanField)
+    def get_is_completed(self, obj) -> bool:
         return obj.status == Todo.Status.COMPLETED
 
+    @extend_schema_field(serializers.DictField(allow_null=True))
     def get_assigner(self, obj):
         return self._user_payload(obj.assigner)
 
+    @extend_schema_field(serializers.DictField(allow_null=True))
     def get_assignee(self, obj):
         return self._user_payload(obj.assignee)
 
+    @extend_schema_field(serializers.DictField(allow_null=True))
     def get_team(self, obj):
         if obj.team is None:
             return None
