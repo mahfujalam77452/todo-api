@@ -292,6 +292,9 @@ Phase 1 endpoints:
 - `GET /api/teams/{id}/members` — members of the authenticated user's team
 - `GET /api/admin/users` — paginated admin-only user list with search/filter and todo counts
 - `PATCH /api/admin/users/{id}` — admin-only role/team update
+- `POST /api/admin/teams` — admin-only team creation
+- `PATCH /api/admin/teams/{id}` — admin-only team rename
+- `DELETE /api/admin/teams/{id}` — admin-only team deletion
 
 To create a repeatable local demo workspace, set `SEED_PASSWORD` and run
 `python manage.py seed_workspace`. The command is never run automatically by

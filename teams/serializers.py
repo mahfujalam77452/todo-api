@@ -1,3 +1,4 @@
+from django.db.models.functions import Lower
 from rest_framework import serializers
 
 from core.fields import StrictCharField
@@ -19,3 +20,14 @@ class TeamSerializer(serializers.ModelSerializer):
         model = Team
         fields = ["id", "name", "created_at"]
         read_only_fields = ["id", "created_at"]
+
+    def validate_name(self, value):
+        queryset = Team.objects.annotate(name_lower=Lower("name")).filter(
+            name_lower=value.lower()
+        )
+        instance = self.instance
+        if instance is not None:
+            queryset = queryset.exclude(pk=instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("A team with this name already exists.")
+        return value

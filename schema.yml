@@ -228,6 +228,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+    get:
+      operationId: categories_retrieve
+      description: 'Categories are global: every user can read them, only admins can
+        change them.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Categories
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
     patch:
       operationId: categories_partial_update
       description: 'Categories are global: every user can read them, only admins can
@@ -267,35 +296,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-    get:
-      operationId: categories_retrieve
-      description: 'Categories are global: every user can read them, only admins can
-        change them.'
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          pattern: ^[1-9][0-9]{0,17}$
-        required: true
-      tags:
-      - Categories
-      security:
-      - BearerAuth: []
-      - BearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Category'
           description: ''
         '404':
           content:
@@ -479,6 +479,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+    get:
+      operationId: todos_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Todos
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
     patch:
       operationId: todos_partial_update
       parameters:
@@ -510,33 +537,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-    get:
-      operationId: todos_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          pattern: ^[1-9][0-9]{0,17}$
-        required: true
-      tags:
-      - Todos
-      security:
-      - BearerAuth: []
-      - BearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Todo'
           description: ''
         '404':
           content:
@@ -768,6 +768,116 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/admin/teams:
+    post:
+      operationId: admin_teams_create
+      description: Create a workspace team.
+      tags:
+      - Admin Teams
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/admin/teams/{id}:
+    delete:
+      operationId: admin_teams_destroy
+      description: Delete a workspace team.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Admin Teams
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    patch:
+      operationId: admin_teams_partial_update
+      description: Rename a workspace team.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,17}$
+        required: true
+      tags:
+      - Admin Teams
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTeamRequest'
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/admin/users:
     get:
       operationId: admin_users_list
@@ -817,6 +927,27 @@ paths:
                 $ref: '#/components/schemas/PaginatedAdminUserList'
           description: ''
   /api/admin/users/{id}:
+    get:
+      operationId: admin_users_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - admin
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
     patch:
       operationId: admin_users_partial_update
       parameters:
@@ -833,27 +964,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedAdminUserRequest'
-      security:
-      - BearerAuth: []
-      - BearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminUser'
-          description: ''
-    get:
-      operationId: admin_users_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this user.
-        required: true
-      tags:
-      - admin
       security:
       - BearerAuth: []
       - BearerAuth: []
@@ -1453,6 +1563,13 @@ components:
           type: string
           minLength: 1
           maxLength: 50
+    PatchedTeamRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
     PatchedTodoRequest:
       type: object
       properties:
@@ -1587,6 +1704,15 @@ components:
       required:
       - created_at
       - id
+      - name
+    TeamRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
       - name
     Todo:
       type: object

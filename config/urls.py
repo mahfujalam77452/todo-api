@@ -6,7 +6,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 from categories.views import CategoryViewSet
 from core.views import ApiNotFoundView, HealthView
 from todos.views import TodoViewSet
-from teams.views import TeamViewSet
+from teams.views import AdminTeamViewSet, TeamViewSet
 from accounts.views import AdminUserViewSet
 from notifications.views import NotificationViewSet
 from dashboard.views import (
@@ -24,6 +24,7 @@ router.include_format_suffixes = False  # no /api/categories.json variants
 router.register("categories", CategoryViewSet, basename="category")
 router.register("todos", TodoViewSet, basename="todo")
 router.register("teams", TeamViewSet, basename="team")
+router.register("admin/teams", AdminTeamViewSet, basename="admin-team")
 router.register("admin/users", AdminUserViewSet, basename="admin-user")
 router.register("notifications", NotificationViewSet, basename="notification")
 

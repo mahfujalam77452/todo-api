@@ -2,10 +2,11 @@ from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 
-from core.schema import ErrorResponseSerializer
+from core.permissions import IsAdminRole
+from core.schema import ErrorResponseSerializer, ValidationErrorResponseSerializer
 
 from .models import Membership, Team
 from .serializers import TeamSerializer
@@ -49,3 +50,43 @@ class TeamViewSet(ReadOnlyModelViewSet):
             for member in members
         ]
         return Response(data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    create=extend_schema(
+        tags=["Admin Teams"],
+        responses={
+            201: TeamSerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            403: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description="Create a workspace team.",
+    ),
+    partial_update=extend_schema(
+        tags=["Admin Teams"],
+        responses={
+            200: TeamSerializer,
+            400: OpenApiResponse(ValidationErrorResponseSerializer),
+            403: OpenApiResponse(ErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description="Rename a workspace team.",
+    ),
+    destroy=extend_schema(
+        tags=["Admin Teams"],
+        responses={
+            204: None,
+            403: OpenApiResponse(ErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description="Delete a workspace team.",
+    ),
+)
+class AdminTeamViewSet(ModelViewSet):
+    """Workspace team management, restricted to users with the admin role."""
+
+    queryset = Team.objects.all()
+    serializer_class = TeamSerializer
+    permission_classes = [IsAdminRole]
+    http_method_names = ["post", "patch", "delete", "head", "options"]
+    lookup_value_regex = r"[1-9][0-9]{0,17}"
