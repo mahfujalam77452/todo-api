@@ -70,7 +70,7 @@ def respond_to_assignment(todo, assignee, accepted, reason=None):
     now = timezone.now()
     with transaction.atomic():
         try:
-            locked = Todo.objects.select_for_update().select_related(
+            locked = Todo.objects.select_for_update(of=("self",)).select_related(
                 "assigner", "assignee"
             ).get(pk=todo.pk)
         except Todo.DoesNotExist:
