@@ -9,7 +9,7 @@ from rest_framework_simplejwt.serializers import (
     TokenRefreshSerializer,
 )
 from drf_spectacular.utils import extend_schema_field
-
+from .services import ensure_team_has_no_other_pm
 from core.exceptions import Conflict
 from core.fields import (
     StrictCharField,
@@ -78,7 +78,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     def validate_role(self, value):
         if value not in User.Role.values:
-            raise serializers.ValidationError("Role must be either 'member' or 'admin'.")
+            raise serializers.ValidationError("Role must be 'member', 'pm' or 'admin'.")
         return value
 
     @extend_schema_field(serializers.DictField(allow_null=True))
@@ -102,6 +102,22 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
         with transaction.atomic():
             target = User.objects.select_for_update().get(pk=instance.pk)
+            current = Membership.objects.select_related("team").filter(user=target).first()
+
+            final_role = requested_role if requested_role is not None else target.role
+            if team_supplied:
+                final_team = team
+            else:
+                final_team = current.team if current is not None else None
+
+            # One Project Manager per team, and a PM must belong to a team.
+            if final_role == User.Role.PM:
+                if final_team is None:
+                    raise Conflict(
+                        "A Project Manager must belong to a team. Assign a team first."
+                    )
+                ensure_team_has_no_other_pm(final_team, target)
+
             if requested_role is not None and requested_role != target.role:
                 if target.role == User.Role.ADMIN and requested_role != User.Role.ADMIN:
                     admin_count = User.objects.select_for_update().filter(
