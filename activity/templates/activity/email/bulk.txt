@@ -1,0 +1,10 @@
+{% autoescape off %}Hi {{ person.name }},
+
+{{ bulk.sender_name }} (Project Manager, {{ team.name }}) sent a message to the team:
+
+{{ bulk.message }}
+
+-- 
+Reply to this email to answer {{ bulk.sender_name }} directly.
+Todo Workspace
+{% endautoescape %}

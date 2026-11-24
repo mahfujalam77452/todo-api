@@ -1,0 +1,6 @@
+<div style="font-family:Arial,sans-serif;font-size:14px;color:#222;max-width:560px">
+  <p>Hi {{ person.name }},</p>
+  <p><strong>{{ bulk.sender_name }}</strong> (Project Manager, {{ team.name }}) sent a message to the team:</p>
+  <div style="border-left:3px solid #4f46e5;padding:4px 12px;background:#f7f7fb">{{ bulk.message|linebreaksbr }}</div>
+  <p style="color:#888;font-size:12px">Reply to this email to answer {{ bulk.sender_name }} directly.<br>Todo Workspace</p>
+</div>

@@ -80,3 +80,54 @@ def send_action_email(self, log_id):
     # Only after a successful send; a failure above is retried.
     ActivityLog.objects.filter(pk=log.pk).update(pm_notified_at=timezone.now())
     return f"sent to {pm.email}"
+
+@shared_task
+def send_bulk_email(bulk_email_id, recipient_ids):
+    """Send one PM message to every listed team member.
+
+    Each person gets their own email, so nobody sees the other addresses.
+    One bad address does not stop the others; failures are only counted.
+    """
+    from django.core.mail import get_connection
+
+    from accounts.models import User
+    from .models import BulkEmail
+
+    try:
+        bulk = BulkEmail.objects.select_related("team", "sender").get(pk=bulk_email_id)
+    except BulkEmail.DoesNotExist:
+        return "bulk email not found"
+    if bulk.sent_at is not None:
+        return "already sent"
+
+    sender_email = bulk.sender.email if bulk.sender else None
+    recipients = User.objects.filter(pk__in=recipient_ids, is_active=True).only("name", "email")
+    subject = " ".join(f"[{bulk.team.name}] {bulk.subject}".split())[:200]
+
+    sent = failed = 0
+    with get_connection() as connection:
+        for person in recipients:
+            context = {"bulk": bulk, "team": bulk.team, "person": person}
+            message = EmailMultiAlternatives(
+                subject=subject,
+                body=render_to_string("activity/email/bulk.txt", context),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[person.email],
+                # Replies go to the PM, not to the no-reply address.
+                reply_to=[sender_email] if sender_email else None,
+                connection=connection,
+            )
+            message.attach_alternative(
+                render_to_string("activity/email/bulk.html", context), "text/html"
+            )
+            try:
+                message.send()
+                sent += 1
+            except Exception:
+                failed += 1
+                logger.exception("Bulk email %s failed for user %s", bulk.pk, person.pk)
+
+    BulkEmail.objects.filter(pk=bulk.pk).update(
+        sent_count=sent, failed_count=failed, sent_at=timezone.now()
+    )
+    return f"sent={sent} failed={failed}"
