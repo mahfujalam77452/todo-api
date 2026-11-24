@@ -51,3 +51,34 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.actor_name} {self.action}: {self.todo_title}"
+
+class BulkEmail(models.Model):
+    """An email the team's Project Manager sent to the whole team."""
+
+    team = models.ForeignKey(
+        "teams.Team", on_delete=models.CASCADE, related_name="bulk_emails"
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="bulk_emails",
+    )
+    sender_name = models.CharField(max_length=150)
+    subject = models.CharField(max_length=150)
+    message = models.TextField()
+    recipient_count = models.PositiveIntegerField(default=0)
+    sent_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Empty while the background task has not finished yet.
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["team", "-created_at"], name="bulkemail_team_created_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.sender_name}: {self.subject}"
