@@ -1,0 +1,18 @@
+{% autoescape off %}Hi {{ pm.name }},
+
+{{ log.actor_name }} {{ verb }} a todo in your team "{{ team.name }}".
+
+Todo:   {{ log.todo_title }}
+Action: {{ log.get_action_display }}
+When:   {{ when|date:"d M Y, h:i A" }}
+{% if assignee %}Assignee: {{ assignee }}
+{% endif %}{% if reason %}Reason: {{ reason }}
+{% endif %}{% if changes %}
+Changes:
+{% for c in changes %}  - {{ c.field }}: {{ c.old|default_if_none:"-" }} -> {{ c.new|default_if_none:"-" }}
+{% endfor %}{% endif %}{% if link %}
+Open the todo: {{ link }}
+{% endif %}
+-- 
+Todo Workspace (automatic message)
+{% endautoescape %}

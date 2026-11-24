@@ -1,0 +1,17 @@
+<div style="font-family:Arial,sans-serif;font-size:14px;color:#222;max-width:560px">
+  <p>Hi {{ pm.name }},</p>
+  <p><strong>{{ log.actor_name }}</strong> {{ verb }} a todo in your team <strong>{{ team.name }}</strong>.</p>
+  <table cellpadding="6" style="border-collapse:collapse;border:1px solid #ddd">
+    <tr><td><strong>Todo</strong></td><td>{{ log.todo_title }}</td></tr>
+    <tr><td><strong>Action</strong></td><td>{{ log.get_action_display }}</td></tr>
+    <tr><td><strong>When</strong></td><td>{{ when|date:"d M Y, h:i A" }}</td></tr>
+    {% if assignee %}<tr><td><strong>Assignee</strong></td><td>{{ assignee }}</td></tr>{% endif %}
+    {% if reason %}<tr><td><strong>Reason</strong></td><td>{{ reason }}</td></tr>{% endif %}
+  </table>
+  {% if changes %}
+  <p><strong>Changes</strong></p>
+  <ul>{% for c in changes %}<li>{{ c.field }}: {{ c.old|default_if_none:"-" }} &rarr; {{ c.new|default_if_none:"-" }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if link %}<p><a href="{{ link }}">Open the todo</a></p>{% endif %}
+  <p style="color:#888;font-size:12px">Todo Workspace (automatic message)</p>
+</div>
