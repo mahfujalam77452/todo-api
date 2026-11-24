@@ -43,5 +43,20 @@ class Membership(models.Model):
     class Meta:
         ordering = ["team_id", "user_id"]
 
+    def clean(self):
+        super().clean()
+        from accounts.models import User
+
+        if getattr(self.user, "role", None) == User.Role.PM and self.team_id:
+            other = (
+                User.objects.filter(role=User.Role.PM, membership__team_id=self.team_id)
+                .exclude(pk=self.user_id)
+                .first()
+            )
+            if other is not None:
+                from django.core.exceptions import ValidationError
+
+                raise ValidationError(f"This team already has a Project Manager ({other.name}).")
+
     def __str__(self):
         return f"{self.user} – {self.team}"

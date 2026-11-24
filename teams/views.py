@@ -46,7 +46,12 @@ class TeamViewSet(ReadOnlyModelViewSet):
 
         members = team.memberships.select_related("user").order_by("user__name", "user_id")
         data = [
-            {"id": member.user_id, "name": member.user.name, "email": member.user.email}
+            {
+                "id": member.user_id,
+                "name": member.user.name,
+                "email": member.user.email,
+                "role": member.user.role,
+            }
             for member in members
         ]
         return Response(data, status=status.HTTP_200_OK)
