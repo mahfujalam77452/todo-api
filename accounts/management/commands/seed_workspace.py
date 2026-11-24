@@ -62,22 +62,22 @@ class Command(BaseCommand):
         Membership.objects.update_or_create(user=admin, defaults={"team": teams["Engineering"]})
 
         members = [
-            ("engineering-one@example.com", "Engineering Member 1", "Engineering"),
-            ("engineering-two@example.com", "Engineering Member 2", "Engineering"),
-            ("design-one@example.com", "Design Member 1", "Design"),
-            ("design-two@example.com", "Design Member 2", "Design"),
+            ("engineering-one@example.com", "Engineering PM", "Engineering", User.Role.PM),
+            ("engineering-two@example.com", "Engineering Member 2", "Engineering", User.Role.MEMBER),
+            ("design-one@example.com", "Design PM", "Design", User.Role.PM),
+            ("design-two@example.com", "Design Member 2", "Design", User.Role.MEMBER),
         ]
-        for email, name, team_name in members:
+        for email, name, team_name, role in members:
             user, created = User.objects.get_or_create(
                 email=email,
-                defaults={"name": name, "role": User.Role.MEMBER},
+                defaults={"name": name, "role": role},
             )
             changed = []
             if user.name != name:
                 user.name = name
                 changed.append("name")
-            if user.role != User.Role.MEMBER:
-                user.role = User.Role.MEMBER
+            if user.role != role:
+                user.role = role
                 changed.append("role")
             if created or not user.has_usable_password():
                 user.set_password(password)
