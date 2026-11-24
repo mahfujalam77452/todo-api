@@ -1,565 +1,170 @@
-# TODO List REST API
+# Todo Workspace - Django REST API
 
-A secure TODO management API built with Django and Django REST Framework.
-Users authenticate with email-based JWT tokens and can access only their own
-related todos. Categories are global, readable by authenticated users, and
-writable only by Django staff users with the relevant model permission.
+Django REST Framework backend for the Todo Workspace application. It provides JWT authentication, team management, Todo assignment workflows, Scrum lifecycle management, notifications, and administrator analytics.
 
 ## Features
 
-- Email-based custom user model
-- Workspace roles (`member` and `admin`) with team memberships
-- JWT access/refresh tokens with refresh-token blacklist logout
-- Private TODOs visible to their assigner and assignee
-- Authenticated profile, team list/member list, and admin user-management APIs
-- Categories with case-insensitive unique names
-- Partial updates with `PATCH`; `PUT` is intentionally disabled
-- Filtering, search, ordering, and limit/offset pagination
-- Due date, priority, overdue, and category filters
-- Redis-backed category caching and throttling when Redis is configured
-- Consistent JSON errors
-- OpenAPI schema, Swagger UI, and ReDoc
-- Django admin customization
-- Unit and API integration tests
+- Email/password registration and login
+- JWT access and rotating refresh tokens
+- Custom `member` and `admin` roles
+- Team creation, membership, and team member management
+- Todo creation, assignment, acceptance, rejection, priority, categories, and due dates
+- Automatic Scrum association for team Todos
+- Scrum lifecycle: `created`, `running`, and `ended`
+- Server-generated Scrum names: `scrum-1`, `scrum-2`, and so on
+- Admin Todo history with Scrum, category, date, and relation filters
+- Admin user performance statistics
+- 14-day bottleneck reporting
+- 90-day completion heatmap
+- Six-month team analytics
+- Persistent overdue alerts and configurable dashboard thresholds
+- Notification events for Todo changes
+- OpenAPI documentation and Django admin
 
 ## Technology
 
 - Python 3.12+
 - Django 5.2
 - Django REST Framework
-- PostgreSQL (production)
-- SQLite (local fallback)
-- Redis (optional for local development, recommended for production)
 - SimpleJWT
 - django-filter
 - drf-spectacular
-- pytest-django, factory_boy, freezegun, coverage
+- SQLite for local development
+- PostgreSQL support for production
+- pytest and factory_boy
 
-## Quick start
+Redis is optional. If `REDIS_URL` is empty or omitted, Django uses a local in-memory cache.
 
-### 1. Clone the repository
+## Local setup
+
+The virtual environment is stored in `venv` in this workspace.
 
 ```bash
-git clone https://github.com/mahfujalam77452/todo-api.git
 cd todo-api
-```
-
-### 2. Create and activate a virtual environment
-
-```bash
-python -m venv venv
 source venv/bin/activate
-```
-
-On Windows PowerShell:
-
-```powershell
-venv\Scripts\Activate.ps1
-```
-
-### 3. Install dependencies
-
-```bash
 pip install -r requirements.txt
-```
-
-### 4. Configure environment variables
-
-```bash
 cp .env.example .env
 ```
 
-Generate a secret key:
+Set at least `SECRET_KEY` and `ALLOWED_HOSTS` in `.env`. For local development, leave `REDIS_URL` empty to use the local memory cache.
+
+Apply migrations:
 
 ```bash
-python -c "from django.core.management.utils import get_random_secret_key as g; print(g())"
+./venv/bin/python manage.py migrate
 ```
 
-Put the generated value in `.env` as `SECRET_KEY`. Never commit `.env`.
-
-### 5. Apply migrations
+Start the API:
 
 ```bash
-python manage.py migrate
+./venv/bin/python manage.py runserver 127.0.0.1:8000
 ```
 
-### 6. Create an admin user
-
-```bash
-python manage.py createsuperuser
-```
-
-The command asks for an email address, name, and password.
-
-### 7. Start the development server
-
-```bash
-python manage.py runserver
-```
-
-The API is available at `http://127.0.0.1:8000`.
-
-## API documentation
-
-Start the server and open:
-
-- Swagger UI: `http://127.0.0.1:8000/api/docs`
-
-- OpenAPI JSON/YAML response: `http://127.0.0.1:8000/api/schema`
-
-### Deployed API
-
-The live API is available at:
+API base URL:
 
 ```text
-https://todo-api-awz4.onrender.com
+http://127.0.0.1:8000/api
 ```
 
-Open the following URLs in a browser:
+Health check:
 
-- Swagger UI: https://todo-api-awz4.onrender.com/api/docs
+```text
+http://127.0.0.1:8000/api/health
+```
 
-- OpenAPI schema: https://todo-api-awz4.onrender.com/api/schema
-- Health check: https://todo-api-awz4.onrender.com/api/health
-
-The health endpoint should return:
+Expected response:
 
 ```json
-{"status": "ok"}
-```
-
-You can also check it from a terminal:
-
-```bash
-curl https://todo-api-awz4.onrender.com/api/health
+{"status":"ok"}
 ```
 
 ## Environment variables
 
 | Variable | Required | Description |
 |---|---:|---|
-| `SECRET_KEY` | Yes | Django secret key |
-| `DEBUG` | No | `true` for local development; use `false` in production |
-| `ALLOWED_HOSTS` | Production | Comma-separated allowed hosts |
-| `DATABASE_URL` | Production | PostgreSQL connection URL, for example `postgresql://user:password@host:5432/database` |
-| `LOG_FILE` | No | Optional rotating log file path |
-| `REDIS_URL` | No | Redis URL, for example `redis://localhost:6379/1` |
-| `JWT_SIGNING_KEY` | No | Separate JWT signing key; must be at least 32 characters |
-| `NUM_PROXIES` | No | Number of trusted reverse proxies used for client IP throttling |
-| `SEED_PASSWORD` | No | Password for the manual `seed_workspace` command; required when `DEBUG=false` |
+| `SECRET_KEY` | Yes | Django application secret |
+| `DEBUG` | No | `true` for local development |
+| `ALLOWED_HOSTS` | Production | Comma-separated host names |
+| `DATABASE_URL` | Production | PostgreSQL connection URL |
+| `REDIS_URL` | No | Redis URL; empty uses in-memory cache |
+| `JWT_SIGNING_KEY` | No | Separate JWT key; use at least 32 characters |
+| `LOG_FILE` | No | Optional rotating application log |
+| `NUM_PROXIES` | No | Trusted reverse proxy count |
 
-If `REDIS_URL` is empty, the project uses per-process in-memory cache. The API
-continues to work, but cache and throttle state is not shared between workers.
+With no `DATABASE_URL`, the local database is `db.sqlite3`.
 
-The application uses `DATABASE_URL` when it is set. For local development,
-leaving it empty uses the SQLite fallback database at `db.sqlite3`. Production
-deployments should always set `DATABASE_URL` to a managed PostgreSQL database.
+## Demo reset and seed
 
-## Redis setup
-
-Redis is optional for a single-process development server.
-
-With Redis running locally:
+The demo script removes all existing database data, applies migrations, and creates realistic dashboard data.
 
 ```bash
-redis-server
+cd todo-api
+./reset_and_seed_demo.sh
 ```
 
-Set this in `.env`:
+Demo credentials:
 
-```dotenv
-REDIS_URL=redis://localhost:6379/1
-```
+| User | Email | Password |
+|---|---|---|
+| Admin | `demo-admin@example.com` | `@#abcd@#1234@#` |
+| General users | `demo-user-1@example.com` through `demo-user-8@example.com` | `@#abcd@#1234@#` |
 
-Redis is recommended for multiple workers because category cache and rate-limit
-counters then use one shared store. If Redis becomes unavailable, caching and
-throttling fail open; the API itself remains available.
+The script creates multiple teams, active and ended Scrums, categories, completed and open Todos, overdue work, rejected assignments, overloaded users, inactive users, and six-month analytics data.
 
-## Docker
+This command is destructive. It flushes the database before seeding.
 
-Docker Compose starts the Django web service and Redis together. It is intended
-for local testing; production deployments should use PostgreSQL through
-`DATABASE_URL`.
+## Main API areas
 
-Create `.env` first and set a real `SECRET_KEY`:
+| Area | Endpoints |
+|---|---|
+| Authentication | `/api/auth/register`, `/api/auth/login`, `/api/auth/token/refresh`, `/api/auth/logout`, `/api/auth/me` |
+| Todos | `/api/todos`, `/api/todos/{id}`, `/api/todos/{id}/assign`, `/api/todos/{id}/accept`, `/api/todos/{id}/reject` |
+| Teams | `/api/teams`, `/api/admin/teams/{id}` |
+| Categories | `/api/categories`, `/api/admin/categories/{id}` |
+| Notifications | `/api/notifications`, `/api/notifications/unread-count` |
+| Admin users | `/api/admin/users`, `/api/admin/users/{id}` |
+| Scrums | `/api/admin/scrums`, `/api/admin/scrums/{id}/start`, `/api/admin/scrums/{id}/end` |
+| Dashboard | `/api/admin/dashboard/overview`, `/api/admin/dashboard/history`, `/api/admin/dashboard/teams`, `/api/admin/dashboard/activity` |
+| Analytics | `/api/admin/dashboard/heatmap`, `/api/admin/dashboard/teams/{team_id}/analytics` |
+| Bottlenecks | `/api/admin/dashboard/bottlenecks/{kind}` |
+
+## Dashboard reporting rules
+
+- Overview and bottleneck statistics use the last 14 days.
+- Bottleneck detail pages use the same 14-day scope as overview cards.
+- The completion heatmap uses actual `completed_at` dates for the last 90 days.
+- Heatmap results include both running and ended Scrum completions.
+- Team creation trends use task `created_at` values from the last six months.
+- Team velocity uses task `completed_at` values from the last six months.
+- Inactive users have no task activity in the last 14 days.
+- User performance metrics count work assigned to the selected user.
+- User history can include both assigned and created work.
+
+## Documentation
+
+When the server is running:
+
+- Swagger UI: `http://127.0.0.1:8000/api/docs`
+- ReDoc: `http://127.0.0.1:8000/api/redoc`
+- OpenAPI schema: `http://127.0.0.1:8000/api/schema`
+
+## Tests
+
+Run the complete suite:
 
 ```bash
-cp .env.example .env
+./venv/bin/python -m pytest
 ```
 
-Then build and start:
+Run the dashboard integration tests:
 
 ```bash
-docker compose up --build -d
+./venv/bin/python -m pytest tests/integration/test_dashboard_api.py -q
 ```
 
-If your secret contains `$` and Compose prints interpolation warnings, run the
-same command with automatic `.env` interpolation disabled. The explicit
-`env_file` entry still loads `.env` as raw values:
+Check migrations and Django configuration:
 
 ```bash
-COMPOSE_DISABLE_ENV_FILE=1 docker compose up --build -d
+./venv/bin/python manage.py makemigrations --check --dry-run
+./venv/bin/python manage.py check
 ```
-
-Check service status and logs:
-
-```bash
-docker compose ps
-docker compose logs -f web
-```
-
-The web container automatically runs migrations and `collectstatic` before
-Gunicorn starts. Verify the healthcheck:
-
-```bash
-curl http://127.0.0.1:8000/api/health
-```
-
-Expected response:
-
-```json
-{"status": "ok"}
-```
-
-Create an admin user inside the web container:
-
-```bash
-docker compose exec web python manage.py createsuperuser
-```
-
-Stop the services without deleting named volumes:
-
-```bash
-docker compose down
-```
-
-To remove the database and Redis data as well, use this destructive command:
-
-```bash
-docker compose down -v
-```
-
-The image runs as a non-root `app` user, and Redis is available to Django at
-`redis://redis:6379/1`. To use PostgreSQL with Compose, set `DATABASE_URL` in
-`.env` to the connection URL of a reachable PostgreSQL instance.
-
-### Run tests inside Docker
-
-The production `web` image excludes the test source files. Compose provides a
-separate `test` profile that mounts the repository read-only and runs the same
-pytest suite inside the container:
-
-```bash
-docker compose --profile test run --rm test
-```
-
-Run only unit tests:
-
-```bash
-docker compose --profile test run --rm test pytest tests/unit
-```
-
-Run only integration tests:
-
-```bash
-docker compose --profile test run --rm test pytest tests/integration
-```
-
-The test service uses an isolated temporary SQLite database and in-memory
-cache, so it does not modify the development database or depend on a locally
-running Redis.
-
-
-
-The committed schema is [schema.yml](./schema.yml). Validate or regenerate it:
-
-```bash
-python manage.py spectacular --file schema.yml --validate
-```
-
-## Workspace roles and teams
-
-Newly registered users are always `member` accounts; request fields such as
-`role`, `is_staff`, and `is_superuser` are ignored during registration.
-Workspace admins are identified by `User.role == "admin"`. Category write
-permissions intentionally remain separate and still require Django `is_staff`
-plus the relevant model permission.
-
-Phase 1 endpoints:
-
-- `GET /api/auth/me` — current user, role, and team
-- `GET /api/teams` — all teams (not paginated)
-- `GET /api/teams/{id}/members` — members of the authenticated user's team
-- `GET /api/admin/users` — paginated admin-only user list with search/filter and todo counts
-- `PATCH /api/admin/users/{id}` — admin-only role/team update
-- `POST /api/admin/teams` — admin-only team creation
-- `PATCH /api/admin/teams/{id}` — admin-only team rename
-- `DELETE /api/admin/teams/{id}` — admin-only team deletion
-
-To create a repeatable local demo workspace, set `SEED_PASSWORD` and run
-`python manage.py seed_workspace`. The command is never run automatically by
-Docker. In non-debug environments it refuses to use a default password.
-
-## Admin dashboard
-
-Workspace admins can access the read-only dashboard endpoints:
-
-- `GET /api/admin/dashboard/overview`
-- `GET /api/admin/dashboard/users`
-- `GET /api/admin/dashboard/teams`
-- `GET /api/admin/dashboard/activity`
-- `GET /api/admin/users/{id}/todos`
-- `GET /api/admin/todos/{id}`
-
-Dashboard completion rate means `completed / total * 100`; user and team
-completion rates use assigned/team todos respectively. Pending-assignment
-bottlenecks are assignments older than seven days, overdue means a non-completed
-todo whose due date has passed, and high-rejection users have a rejection rate
-of at least 50% with at least one rejected assignment. All dashboard endpoints
-are role-admin-only and reject write methods.
-
-Category management deliberately remains based on Django `is_staff` and model
-permissions; workspace `role=admin` controls the workspace/admin APIs and does
-not automatically grant category write access. SQLite ignores
-`select_for_update()`, so production deployments should use PostgreSQL for
-strong concurrent accept/reject locking.
-
-In Swagger UI, click **Authorize** and enter:
-
-```text
-Bearer <access-token>
-```
-
-## Authentication flow
-
-### Register
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Alice",
-    "email": "alice@example.com",
-    "password": "A-safe-password-123!"
-  }'
-```
-
-### Login
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "alice@example.com",
-    "password": "A-safe-password-123!"
-  }'
-```
-
-The response contains `access`, `refresh`, and `user`. Use the access token:
-
-```bash
-curl http://127.0.0.1:8000/api/todos \
-  -H "Authorization: Bearer <access-token>"
-```
-
-### Refresh
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/token/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refresh": "<refresh-token>"}'
-```
-
-### Logout
-
-```bash
-curl -i -X POST http://127.0.0.1:8000/api/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{"refresh": "<refresh-token>"}'
-```
-
-Logout blacklists the refresh token and returns `204 No Content`.
-
-## Endpoint summary
-
-| Method | Endpoint | Authentication | Description |
-|---|---|---|---|
-| `GET` | `/api/health` | Public | Liveness check |
-| `POST` | `/api/auth/register` | Public | Register with email |
-| `POST` | `/api/auth/login` | Public | Obtain access/refresh tokens |
-| `POST` | `/api/auth/token/refresh` | Public | Rotate refresh token |
-| `POST` | `/api/auth/logout` | Public with refresh token | Blacklist refresh token |
-| `GET` | `/api/todos` | Authenticated | List todos assigned by or to the user |
-| `POST` | `/api/todos` | Authenticated | Create a todo |
-| `GET` | `/api/todos/{id}` | Authenticated | Retrieve a related todo |
-| `PATCH` | `/api/todos/{id}` | Authenticated | Partially update a related todo |
-| `DELETE` | `/api/todos/{id}` | Authenticated | Hard-delete a related todo |
-| `POST` | `/api/todos/{id}/assign` | Assigner | Assign to a same-team member |
-| `GET` | `/api/categories` | Authenticated | List categories |
-| `GET` | `/api/categories/{id}` | Authenticated | Retrieve a category |
-| `POST` | `/api/categories` | Admin | Create a category |
-| `PATCH` | `/api/categories/{id}` | Admin | Update a category |
-| `DELETE` | `/api/categories/{id}` | Admin | Delete a category |
-
-`PUT` is disabled for TODOs and categories and returns `405 Method Not Allowed`.
-
-## Todo examples
-
-### Create
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/todos \
-  -H "Authorization: Bearer <access-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Buy groceries",
-    "description": "Milk and rice",
-    "priority": 3,
-    "due_date": "2026-12-01T18:00:00+06:00"
-  }'
-```
-
-### Partial update
-
-```bash
-curl -X PATCH http://127.0.0.1:8000/api/todos/1 \
-  -H "Authorization: Bearer <access-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "completed"}'
-```
-
-### List, filter, search, order, and paginate
-
-```text
-GET /api/todos?limit=10&offset=0
-GET /api/todos?status=pending
-GET /api/todos?status=in_progress
-GET /api/todos?assignment_status=pending&relation=assigned_to_me
-GET /api/todos?team=1
-GET /api/todos?priority=3&overdue=true
-GET /api/todos?has_category=true
-GET /api/todos?search=groceries
-GET /api/todos?ordering=-created_at
-```
-
-List responses use:
-
-```json
-{
-  "count": 1,
-  "limit": 10,
-  "offset": 0,
-  "next": null,
-  "previous": null,
-  "results": []
-}
-```
-
-## Category management
-
-Any authenticated user can read categories. Only an active staff user with the
-corresponding Django model permission can create, update, or delete them.
-Superusers have all permissions.
-
-Create a category through the admin panel:
-
-1. Open `http://127.0.0.1:8000/admin/`.
-2. Log in with the superuser created above.
-3. Open **Categories** and add a category.
-
-Deleting a category sets the category of related todos to `null`; it does not
-delete those todos.
-
-## Error format
-
-Errors use a consistent JSON shape:
-
-```json
-{
-  "error": "Readable error message",
-  "code": 400
-}
-```
-
-Validation errors also include all field errors:
-
-```json
-{
-  "error": "title: This field may not be blank. (and 1 more)",
-  "code": 400,
-  "details": {
-    "title": ["This field may not be blank."],
-    "priority": ["Must be one of: 1 (Low), 2 (Medium), 3 (High)."]
-  }
-}
-```
-
-An authenticated user's todo that belongs to another user returns `404`, not
-`403`, to avoid revealing whether that todo exists.
-
-## Running tests
-
-Run all unit and integration tests:
-
-```bash
-pytest tests/unit tests/integration
-```
-
-Run only unit tests:
-
-```bash
-pytest tests/unit
-```
-
-Run only integration tests:
-
-```bash
-pytest tests/integration
-```
-
-The pytest configuration shows every test name and result. Failures include
-the assertion message and full traceback.
-
-Coverage report:
-
-```bash
-coverage erase
-coverage run -m pytest tests/unit tests/integration
-coverage report -m
-coverage html
-```
-
-Open the HTML report at `htmlcov/index.html`.
-
-## Important project decisions
-
-- **PATCH instead of PUT:** updates are partial and accidental full replacement
-  is prevented.
-- **Hard delete:** deleting a todo permanently removes it.
-- **Limit/offset pagination:** follows DRF's standard response shape and keeps
-  large list responses bounded.
-- **Stable ordering:** `-created_at, -id` prevents duplicate or missing rows
-  across pages when timestamps are equal.
-- **404 for another user's todo:** prevents an ID-existence side channel.
-- **Category `SET_NULL`:** deleting a global category preserves user data.
-- **Strict input fields:** booleans, integers, dates, and strings reject
-  ambiguous JSON types instead of silently coercing them.
-- **Redis is optional locally:** development works without Redis, while
-  production should use shared Redis for consistent cache and throttling.
-
-## Known limitations
-
-- Local development has a SQLite fallback; production uses PostgreSQL.
-- PostgreSQL should be used for concurrent or horizontally scaled deployments.
-- Without Redis, throttle counters and cache entries are process-local.
-- Docker/Compose is available for local container-based testing; native Python
-  setup is the primary development workflow.
-
-## Security notes
-
-- Never commit `.env`, passwords, JWT signing keys, or production database
-  files.
-- Use `DEBUG=false` and explicit `ALLOWED_HOSTS` in production.
-- Use HTTPS for deployed API and admin traffic.
-- Use a separate, strong `JWT_SIGNING_KEY` in production and rotate it if
-  exposed.

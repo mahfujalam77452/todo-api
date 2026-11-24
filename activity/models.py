@@ -82,3 +82,25 @@ class BulkEmail(models.Model):
 
     def __str__(self):
         return f"{self.sender_name}: {self.subject}"
+        
+class DailySummary(models.Model):
+    """Remembers that a team's summary for one day was sent (never twice)."""
+
+    team = models.ForeignKey(
+        "teams.Team", on_delete=models.CASCADE, related_name="daily_summaries"
+    )
+    report_date = models.DateField()
+    sent_to = models.EmailField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-report_date", "team_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["team", "report_date"], name="daily_summary_team_date_unique"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.team} {self.report_date}"

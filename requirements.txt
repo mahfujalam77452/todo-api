@@ -21,7 +21,6 @@ psycopg-binary==3.3.8
 PyJWT==2.15.1
 pytest==8.4.2
 pytest-django==4.11.1
-python-dateutil==4.0.0
 python-dotenv==1.2.4
 PyYAML==6.0.3
 redis==8.1.0
@@ -32,3 +31,8 @@ typing_extensions==4.16.0
 tzdata==2026.6
 uritemplate==4.2.0
 whitenoise==6.9.0
+celery==5.7.0
+# PDF reports
+reportlab==5.1.0
+pillow==13.0.0
+charset-normalizer==3.5.3

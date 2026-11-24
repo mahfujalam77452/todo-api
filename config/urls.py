@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-
+from activity.views import BulkEmailViewSet
 from categories.views import CategoryViewSet
 from core.views import ApiNotFoundView, HealthView
 from todos.views import TodoViewSet
@@ -35,6 +35,7 @@ router.register("teams", TeamViewSet, basename="team")
 router.register("admin/teams", AdminTeamViewSet, basename="admin-team")
 router.register("admin/users", AdminUserViewSet, basename="admin-user")
 router.register("notifications", NotificationViewSet, basename="notification")
+router.register("pm/bulk-emails", BulkEmailViewSet, basename="pm-bulk-email")
 
 urlpatterns = [
     path("admin/", admin.site.urls),

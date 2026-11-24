@@ -272,6 +272,7 @@ THROTTLE_RATES = {
     "register": "5/hour",   # per IP: slows down account creation and email probing
     "token": "30/min",      # per IP: refresh and logout
     "notifications": "120/min",  # notification polling has its own budget
+    "bulk_email": "10/hour",     # per user: a PM cannot spam the team
 }
 
 
@@ -325,6 +326,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Todos", "description": "Private todos owned by the authenticated user."},
         {"name": "Categories", "description": "Global categories; writes require admin permissions."},
         {"name": "System", "description": "Health and API documentation endpoints."},
+        {"name": "Project Manager", "description": "PM-only: email the whole team."},
     ],
 }
 
