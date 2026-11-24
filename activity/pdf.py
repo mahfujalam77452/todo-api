@@ -159,7 +159,7 @@ class _Pdf:
             (snap["stale"], f"WAITING > {s['stale_hours']}H", WARN if snap["stale"] else INK),
         ], width))
         story.append(Spacer(1, 3))
-        story.append(self.p("Counts cover todos that are assigned inside this team. Rejected and completed todos are not 'active'.", "muted"))
+        story.append(self.p("Counts cover the todos that belong to this team. Rejected and completed todos are not 'active'.", "muted"))
 
         story += self.attention_section(width)
         story += self.members_section(width)
@@ -198,7 +198,7 @@ class _Pdf:
         if s["rejected"]:
             rows = [[self.p(i["todo"]), self.p(i["actor"]), self.p(i["reason"] or "No reason given")] for i in s["rejected"]]
             parts.append(KeepTogether([
-                self.p(f"Rejected today ({len(s['rejected'])})", "cellb"), Spacer(1, 3),
+                self.p(f"Rejected during the day ({len(s['rejected'])})", "cellb"), Spacer(1, 3),
                 self.table(["Todo", "Rejected by", "Reason"], rows, [width * .40, width * .22, width * .38]),
             ]))
         return parts

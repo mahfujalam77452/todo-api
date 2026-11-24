@@ -124,7 +124,7 @@ def test_scrum_history_filters_and_admin_bottlenecks(api_client):
     member = UserFactory(email="scrum-member@example.com")
     team = TeamFactory(name="Scrum Team")
     Membership.objects.create(user=member, team=team)
-    scrum = Scrum.objects.create(team=team, name="Sprint 1", status=Scrum.Status.ENDED)
+    scrum = Scrum.objects.create(team=team, name="Sprint 1")
     login(api_client, admin)
 
     start = api_client.post(f"/api/admin/scrums/{scrum.pk}/start", {}, format="json")
