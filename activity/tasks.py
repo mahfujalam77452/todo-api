@@ -131,3 +131,100 @@ def send_bulk_email(bulk_email_id, recipient_ids):
         sent_count=sent, failed_count=failed, sent_at=timezone.now()
     )
     return f"sent={sent} failed={failed}"
+
+
+# ------------------------------------------------------------ daily PDF summary
+@shared_task
+def send_daily_team_summaries(report_date=None):
+    """Run by Celery Beat at 00:00 (Asia/Dhaka): queue one summary per team.
+
+    The report covers the day that just ended. One task per team, so a problem
+    in one team never blocks the others.
+    """
+    from datetime import date, timedelta
+
+    from .reports import teams_with_pm
+
+    day = date.fromisoformat(report_date) if report_date else timezone.localdate() - timedelta(days=1)
+    team_ids = teams_with_pm()
+    for team_id in team_ids:
+        send_team_summary.delay(team_id, day.isoformat())
+    return f"queued {len(team_ids)} team summaries for {day.isoformat()}"
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def send_team_summary(self, team_id, report_date, force=False):
+    """Build the PDF summary of one team for one day and mail it to the team's PM."""
+    from datetime import date
+
+    from django.template.defaultfilters import slugify
+
+    from teams.models import Team
+
+    from .models import DailySummary
+    from .pdf import render_summary_pdf
+    from .reports import build_team_summary
+
+    day = date.fromisoformat(report_date)
+    try:
+        team = Team.objects.get(pk=team_id)
+    except Team.DoesNotExist:
+        return "team not found"
+
+    pm = get_team_pm(team_id)
+    if pm is None:
+        return "team has no project manager"
+
+    record, _ = DailySummary.objects.get_or_create(team=team, report_date=day)
+    if record.sent_at is not None and not force:
+        return "already sent"
+
+    summary = build_team_summary(team, day)
+    pdf_bytes = render_summary_pdf(summary)
+    filename = f"team-summary-{slugify(team.name) or team.pk}-{day.isoformat()}.pdf"
+
+    stats, snap = summary["day_stats"], summary["snapshot"]
+    body = (
+        f"Hi {pm.name},\n\n"
+        f"Here is the daily summary of team \"{team.name}\" for {day:%A, %d %B %Y}.\n\n"
+        + "\n".join(f"  - {line}" for line in summary["highlights"])
+        + f"\n\nThe day: {stats['total']} actions, {stats['created']} todos created, "
+        f"{stats['completed']} completed, {stats['accepted']} accepted, {stats['rejected']} rejected."
+        f"\nNow: {snap['active']} active todos, {snap['overdue']} overdue, "
+        f"{snap['awaiting']} awaiting an answer.\n\n"
+        "The full report (member overview and timeline) is attached as a PDF.\n\n"
+        "-- \nTodo Workspace (automatic message)\n"
+    )
+    message = EmailMultiAlternatives(
+        subject=f"[{team.name}] Daily summary - {day:%d %b %Y}",
+        body=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[pm.email],
+    )
+    message.attach(filename, pdf_bytes, "application/pdf")
+    message.send()
+
+    record.sent_to = pm.email
+    record.sent_at = timezone.now()
+    record.save(update_fields=["sent_to", "sent_at"])
+    _save_report_copy(filename, pdf_bytes)
+    return f"sent {filename} to {pm.email}"
+
+
+def _save_report_copy(filename, pdf_bytes):
+    """Keep a copy on disk when REPORTS_DIR is set. Never fails the task."""
+    if not settings.REPORTS_DIR:
+        return
+    try:
+        from pathlib import Path
+
+        folder = Path(settings.REPORTS_DIR)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / filename).write_bytes(pdf_bytes)
+    except OSError:
+        logger.warning("Could not save a copy of %s", filename, exc_info=True)
