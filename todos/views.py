@@ -110,10 +110,21 @@ class TodoViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         assignee = serializer.validated_data.get("assignee_id")
+        # A todo made by a team member belongs to that team and joins the team's
+        # running Scrum (if there is one), even when nobody is assigned yet.
+        membership = Membership.objects.select_related("team").filter(user=self.request.user).first()
+        team = membership.team if membership else None
+        scrum = None
+        if team is not None:
+            scrum = (
+                Scrum.objects.filter(team=team, status=Scrum.Status.RUNNING)
+                .order_by("-started_at", "-id")
+                .first()
+            )
         with transaction.atomic():
             if assignee is not None:
                 validate_assignment(self.request.user, assignee)
-            todo = serializer.save(assigner=self.request.user)
+            todo = serializer.save(assigner=self.request.user, team=team, scrum=scrum)
             if assignee is not None:
                 # One "created" email that already says who it was assigned to,
                 # not a "created" email plus an "assigned" email.
