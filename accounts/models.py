@@ -44,6 +44,7 @@ class UserManager(BaseUserManager):
 class User(AbstractUser):
     class Role(models.TextChoices):
         MEMBER = "member", "Member"
+        PM = "pm", "Project Manager"
         ADMIN = "admin", "Admin"
 
     # Drop the fields we don't use from AbstractUser.
@@ -66,7 +67,7 @@ class User(AbstractUser):
         constraints = [
             models.UniqueConstraint(Lower("email"), name="user_email_ci_unique"),
             models.CheckConstraint(
-                condition=models.Q(role__in=["member", "admin"]),
+                condition=models.Q(role__in=["member", "pm", "admin"]),
                 name="user_role_valid",
             ),
         ]
@@ -81,7 +82,10 @@ class User(AbstractUser):
         # Safety net for any code path that skips the manager/clean().
         self.email = (self.email or "").strip().lower()
         super().save(*args, **kwargs)
-
+        
+    @property
+    def is_pm(self):
+        return self.role == self.Role.PM
     def get_full_name(self):
         return self.name
 
