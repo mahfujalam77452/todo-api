@@ -95,10 +95,12 @@ INSTALLED_APPS = [
     "core",
     "accounts",
     "teams",
+    "scrums",
     "categories",
     "todos",
     "notifications",
     "dashboard",
+    "activity",
 
 ]
 
@@ -386,3 +388,36 @@ if LOG_FILE:
         }
         for target in (LOGGING["root"], *LOGGING["loggers"].values()):
             target.setdefault("handlers", []).append("file")
+# ------------------------------------------------------------------------ email
+# Development: emails are printed in the console, nothing is really sent.
+# To send real mail later set EMAIL_BACKEND to the smtp backend + EMAIL_HOST*
+# in .env; no code change is needed.
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+).strip()
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Todo Workspace <noreply@todo.local>").strip()
+# Used for the links inside emails.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").strip()
+
+
+# ----------------------------------------------------------------------- celery
+# Broker = Redis (CELERY_BROKER_URL, or REDIS_URL). Without any broker the tasks
+# run immediately inside the request ("eager"), so no Redis/worker is needed locally.
+_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "").strip() or REDIS_URL
+CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", default=not _BROKER_URL)
+# "memory://" is a placeholder so Celery does not look for a RabbitMQ on localhost.
+CELERY_BROKER_URL = _BROKER_URL or "memory://"
+# An eager task that fails must not turn the API request into a 500.
+CELERY_TASK_EAGER_PROPAGATES = False
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# If Redis is down, fail fast instead of hanging the request.
+CELERY_BROKER_TRANSPORT_OPTIONS = {"socket_connect_timeout": 1, "socket_timeout": 1}
+CELERY_TASK_PUBLISH_RETRY_POLICY = {
+    "max_retries": 1,
+    "interval_start": 0,
+    "interval_step": 0.2,
+    "interval_max": 0.5,
+}

@@ -16,6 +16,14 @@ from dashboard.views import (
     DashboardTeamsView,
     DashboardUsersView,
     OverviewView,
+    AdminScrumListView,
+    AdminScrumStartView,
+    AdminScrumEndView,
+    AdminDashboardSettingsView,
+    AdminTodoHistoryView,
+    AdminBottleneckTodosView,
+    AdminTeamAnalyticsView,
+    AdminCompletionHeatmapView,
 )
 
 # Default routes, but without the trailing slash: /api/categories, /api/categories/1
@@ -41,6 +49,14 @@ urlpatterns = [
     path("api/admin/dashboard/users", DashboardUsersView.as_view(), name="admin-dashboard-users"),
     path("api/admin/dashboard/teams", DashboardTeamsView.as_view(), name="admin-dashboard-teams"),
     path("api/admin/dashboard/activity", DashboardActivityView.as_view(), name="admin-dashboard-activity"),
+    path("api/admin/dashboard/history", AdminTodoHistoryView.as_view(), name="admin-dashboard-history"),
+    path("api/admin/dashboard/settings", AdminDashboardSettingsView.as_view(), name="admin-dashboard-settings"),
+    path("api/admin/dashboard/teams/<int:team_id>/analytics", AdminTeamAnalyticsView.as_view(), name="admin-team-analytics"),
+    path("api/admin/dashboard/heatmap", AdminCompletionHeatmapView.as_view(), name="admin-completion-heatmap"),
+    path("api/admin/dashboard/bottlenecks/<str:kind>", AdminBottleneckTodosView.as_view(), name="admin-bottleneck-todos"),
+    path("api/admin/scrums", AdminScrumListView.as_view(), name="admin-scrums"),
+    path("api/admin/scrums/<int:scrum_id>/start", AdminScrumStartView.as_view(), name="admin-scrum-start"),
+    path("api/admin/scrums/<int:scrum_id>/end", AdminScrumEndView.as_view(), name="admin-scrum-end"),
     path("api/admin/users/<int:user_id>/todos", AdminUserTodosView.as_view(), name="admin-user-todos"),
     path("api/admin/todos/<int:todo_id>", AdminTodoDetailView.as_view(), name="admin-todo-detail"),
     # Must stay last: any other /api/... URL is a JSON 404.
