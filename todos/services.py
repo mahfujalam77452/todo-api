@@ -3,7 +3,10 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from teams.models import Membership
+from activity.models import ActivityLog
+from activity.services import record_activity
 from notifications.services import notify_accepted, notify_assigned, notify_rejected
+from scrums.models import Scrum
 
 from .models import Todo
 
@@ -26,31 +29,46 @@ def validate_assignment(assigner, assignee):
     return assigner_membership.team
 
 
-def assign_todo(todo, assigner, assignee):
+def assign_todo(todo, assigner, assignee,record = True):
     if todo.assigner_id != assigner.pk:
         raise PermissionDenied("Only the todo assigner can assign it.")
 
     team = validate_assignment(assigner, assignee)
+    active_scrum = Scrum.objects.filter(
+        team=team, status=Scrum.Status.RUNNING
+    ).order_by("-started_at", "-id").first()
     now = timezone.now()
     assignment_status = (
         Todo.AssignmentStatus.ACCEPTED
         if assignee.pk == assigner.pk
         else Todo.AssignmentStatus.PENDING
     )
+    assignment_update = {
+        "assignee": assignee,
+        "team": team,
+        "assignment_status": assignment_status,
+        "assigned_at": now,
+        "responded_at": now if assignment_status == Todo.AssignmentStatus.ACCEPTED else None,
+        "updated_at": now,
+    }
+    if active_scrum is not None:
+        assignment_update["scrum"] = active_scrum
     with transaction.atomic():
         Todo.objects.filter(pk=todo.pk, assigner=assigner).update(
-            assignee=assignee,
-            team=team,
-            assignment_status=assignment_status,
-            assigned_at=now,
-            responded_at=now if assignment_status == Todo.AssignmentStatus.ACCEPTED else None,
-            updated_at=now,
+            **assignment_update,
         )
         if assignee.pk != assigner.pk:
             notify_assigned(todo, assignee)
+                
+        if record:
+            record_activity(
+                assigner, ActivityLog.Action.ASSIGNED, todo, {"assignee": assignee.name}
+            )
 
     todo.assignee = assignee
     todo.team = team
+    if active_scrum is not None:
+        todo.scrum = active_scrum
     todo.assignment_status = assignment_status
     todo.assigned_at = now
     todo.responded_at = now if assignment_status == Todo.AssignmentStatus.ACCEPTED else None
@@ -90,9 +108,16 @@ def respond_to_assignment(todo, assignee, accepted, reason=None):
         locked.assignment_status = new_status
         locked.responded_at = now
         locked.updated_at = now
+        
         if accepted:
             notify_accepted(locked, locked.assigner)
         else:
             notify_rejected(locked, locked.assigner, reason=reason)
+        record_activity(
+            assignee,
+            ActivityLog.Action.ACCEPTED if accepted else ActivityLog.Action.REJECTED,
+            locked,
+            {"reason": reason} if reason else {},
+        )
         todo = locked
     return todo

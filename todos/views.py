@@ -7,7 +7,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
-
+from activity.models import ActivityLog
+from activity.services import diff_todo, record_activity, snapshot_todo
 from core.filters import StrictOrderingFilter, StrictSearchFilter
 from core.schema import ErrorResponseSerializer, ValidationErrorResponseSerializer
 
@@ -20,6 +21,8 @@ from .serializers import (
     TodoSerializer,
 )
 from .services import assign_todo, respond_to_assignment, validate_assignment
+from scrums.models import Scrum
+from teams.models import Membership
 
 
 def _title_ci(descending):
@@ -112,8 +115,33 @@ class TodoViewSet(ModelViewSet):
                 validate_assignment(self.request.user, assignee)
             todo = serializer.save(assigner=self.request.user)
             if assignee is not None:
-                assign_todo(todo, self.request.user, assignee)
+                # One "created" email that already says who it was assigned to,
+                # not a "created" email plus an "assigned" email.
+                assign_todo(todo, self.request.user, assignee, record=False)
+            record_activity(
+                self.request.user,
+                ActivityLog.Action.CREATED,
+                todo,
+                {"assignee": assignee.name} if assignee is not None else {},
+            )
 
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            before = snapshot_todo(serializer.instance)
+            todo = serializer.save()
+            changes = diff_todo(before, todo)
+            if changes:
+                record_activity(
+                    self.request.user,
+                    ActivityLog.Action.UPDATED,
+                    todo,
+                    {"changes": changes},
+                )
+
+    def perform_destroy(self, instance):
+        with transaction.atomic():
+            record_activity(self.request.user, ActivityLog.Action.DELETED, instance)
+            instance.delete()
     @extend_schema(
         request=AssignTodoSerializer,
         responses={

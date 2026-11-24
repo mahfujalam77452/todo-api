@@ -49,6 +49,7 @@ class TodoSerializer(serializers.ModelSerializer):
     assigner = serializers.SerializerMethodField()
     assignee = serializers.SerializerMethodField()
     team = serializers.SerializerMethodField()
+    scrum = serializers.SerializerMethodField()
     assignment_status = serializers.CharField(read_only=True, allow_null=True)
     assignee_id = StrictPrimaryKeyRelatedField(
         queryset=User.objects.filter(is_active=True),
@@ -74,11 +75,13 @@ class TodoSerializer(serializers.ModelSerializer):
             "assignee",
             "assignee_id",
             "team",
+            "scrum",
             "assignment_status",
             "assigned_at",
             "responded_at",
             "created_at",
             "updated_at",
+            "completed_at",
         ]
          # `user` is deliberately not a field: clients can never set it.
         read_only_fields = [
@@ -111,6 +114,12 @@ class TodoSerializer(serializers.ModelSerializer):
         if obj.team is None:
             return None
         return {"id": obj.team.pk, "name": obj.team.name}
+
+    @extend_schema_field(serializers.DictField(allow_null=True))
+    def get_scrum(self, obj):
+        if obj.scrum is None:
+            return None
+        return {"id": obj.scrum.pk, "name": obj.scrum.name, "status": obj.scrum.status}
 
     @staticmethod
     def _user_payload(user):
@@ -164,6 +173,10 @@ class TodoSerializer(serializers.ModelSerializer):
             return instance
 
         now = timezone.now()
+        if changed.get("status") == Todo.Status.COMPLETED:
+            changed["completed_at"] = instance.completed_at or now
+        elif changed.get("status") is not None:
+            changed["completed_at"] = None
         
         rows = Todo.objects.filter(pk=instance.pk).update(**changed, updated_at=now)
         

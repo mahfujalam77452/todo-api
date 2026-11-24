@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.db.models import F, Q
 from django.db.models.functions import Length, Lower
 from django.db.models.lookups import GreaterThan, LessThanOrEqual
@@ -58,6 +59,13 @@ class Todo(models.Model):
         null=True,
         blank=True,
     )
+    scrum = models.ForeignKey(
+        "scrums.Scrum",
+        on_delete=models.SET_NULL,
+        related_name="todos",
+        null=True,
+        blank=True,
+    )
     assignment_status = models.CharField(
         max_length=20,
         choices=AssignmentStatus.choices,
@@ -68,6 +76,7 @@ class Todo(models.Model):
     responded_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]
@@ -97,6 +106,7 @@ class Todo(models.Model):
                 fields=["assignee", "-created_at", "-id"],
                 name="todo_assignee_created_idx",
             ),
+            models.Index(fields=["scrum", "status", "-created_at", "-id"], name="todo_scrum_status_idx"),
         ]
         constraints = [
             # SQLite does NOT enforce VARCHAR(255); enforce it ourselves.
@@ -127,6 +137,15 @@ class Todo(models.Model):
             ),
         ]
     def __str__(self):
-        
         return f"Todo #{self.pk}"
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if self.status == self.Status.COMPLETED and self.completed_at is None:
+            self.completed_at = timezone.now()
+        elif self.status != self.Status.COMPLETED:
+            self.completed_at = None
+        if update_fields is not None and "completed_at" not in update_fields:
+            kwargs["update_fields"] = set(update_fields) | {"completed_at"}
+        super().save(*args, **kwargs)
     
