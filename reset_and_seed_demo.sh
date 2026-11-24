@@ -25,7 +25,16 @@ echo "Deleting existing database data..."
 echo "Creating demo admin, users, teams, Scrums, and dashboard activity..."
 "${PYTHON}" manage.py seed_demo_dashboard --password "${PASSWORD}"
 
+echo "Adding Project Managers, team activity, notifications and bulk emails..."
+"${PYTHON}" manage.py seed_demo_data --password "${PASSWORD}"
+
 echo
 echo "Demo workspace is ready."
 echo "Admin email: demo-admin@example.com"
+echo "Project Managers: engineering-one@example.com (Engineering), design-one@example.com (Design)"
 echo "Admin/user password: ${PASSWORD}"
+echo
+echo "Run the API with REDIS_URL empty to see emails in the console:"
+echo "  REDIS_URL= python manage.py runserver"
+echo "Send the daily PDF summary now (no need to wait for midnight):"
+echo "  python manage.py send_daily_summary --force"
