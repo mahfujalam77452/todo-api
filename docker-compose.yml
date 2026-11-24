@@ -53,6 +53,27 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+  beat:
+    build:
+      context: .
+      target: runtime
+    env_file:
+      - path: .env
+        format: raw
+    environment:
+      DEBUG: "false"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      REDIS_URL: redis://redis:6379/1
+      DB_PATH: /data/db.sqlite3
+      LOG_FILE: ""
+      COLLECTSTATIC: "false"
+    command: ["celery", "-A", "config", "beat", "-l", "info", "-s", "/tmp/celerybeat-schedule"]
+    volumes:
+      - sqlite_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
   test:
     profiles: ["test"]
     build:

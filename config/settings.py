@@ -401,6 +401,7 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Todo Workspace <norep
 # Used for the links inside emails.
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").strip()
 
+from celery.schedules import crontab  # noqa: E402
 
 # ----------------------------------------------------------------------- celery
 # Broker = Redis (CELERY_BROKER_URL, or REDIS_URL). Without any broker the tasks
@@ -423,3 +424,21 @@ CELERY_TASK_PUBLISH_RETRY_POLICY = {
     "interval_step": 0.2,
     "interval_max": 0.5,
 }
+
+# Periodic tasks (run by `celery -A config beat`). crontab uses CELERY_TIMEZONE,
+# so 00:00 means midnight in Asia/Dhaka. It summarises the day that just ended.
+CELERY_BEAT_SCHEDULE = {
+    "daily-team-summary": {
+        "task": "activity.tasks.send_daily_team_summaries",
+        "schedule": crontab(hour=0, minute=0),
+    },
+}
+
+# ------------------------------------------------------------------ PDF reports
+# A copy of every summary PDF is also saved here (handy in development, where
+# the console email backend only prints the attachment as base64 text).
+# Set REPORTS_DIR= (empty) to turn the copy off.
+REPORTS_DIR = os.environ.get("REPORTS_DIR", str(BASE_DIR / "reports") if DEBUG else "").strip()
+# Optional Unicode fonts (.ttf) for names that Helvetica cannot draw (see activity/pdf.py).
+PDF_FONT_PATH = os.environ.get("PDF_FONT_PATH", "").strip()
+PDF_FONT_BOLD_PATH = os.environ.get("PDF_FONT_BOLD_PATH", "").strip()

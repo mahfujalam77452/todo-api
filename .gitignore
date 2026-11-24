@@ -28,3 +28,7 @@ htmlcov/
 #File
 TODO_API_Project_Plan.md
 API_DOCUMENTATION.md
+
+# Generated reports
+reports/
+celerybeat-schedule*
